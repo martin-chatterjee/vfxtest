@@ -1,5 +1,7 @@
 # vfx-test
-<br>
+
+[<p align="center">**How do I use this?**</p>](./docs/USAGE.md)
+
 
 ## What's this about?
 
