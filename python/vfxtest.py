@@ -4,6 +4,7 @@
 # -----------------------------------------------------------------------------
 
 import sys
+import os
 import argparse
 
 
@@ -15,18 +16,28 @@ def main(args):
 
     # DBG
     for key in settings:
-        print('{} :    {}'.format(key.ljust(15), [settings[key]]))
+        print('{} :    {}'.format(key.ljust(15), settings[key]))
 
 
 # -----------------------------------------------------------------------------
 def _parseArgs(args):
     """
     """
+
+    # TODO
+    #       root folder name tests and run-all=None: --> run-all=True
+    #       root folder name anything else and run-all=None: --> run-all=False
+
+    #       explicit prefs is None
+    #           try to find prefs file in cwd: --> use it
+    #           try to find prefs file in parent folder: --> use it
+
+
     parser = argparse.ArgumentParser(description='Run test suite(s):')
 
     parser.add_argument('filter_tokens', nargs='*', type=str,
                         help='specify tokens that filter down the test files by name.')
-    parser.add_argument('-ra', '--run-all', action='store_true',
+    parser.add_argument('-ra', '--run-all', type=__stringToBool, default=None,
                         help='Runs all test suites in all subfolders of '
                              'the current working directory.')
     parser.add_argument('-c', '--clear', type=__stringToBool, default=None,
@@ -57,11 +68,17 @@ def _parseArgs(args):
         else:
             settings['clear'] = False
 
+
+    settings['cwd'] = os.getcwd()
+    settings['prefs'] = os.path.abspath(settings['prefs'])
+    settings['target'] = os.path.abspath(settings['target'])
+
     # read out prefs file
     try:
         _readPrefs(settings)
     except Exception as e:
         parser.error('Invalid .prefs file: {}'.format(settings['prefs']))
+
 
     return settings
 
@@ -73,7 +90,7 @@ def _readPrefs(settings):
     #       store everything in settings
     #       raise exception on error
     settings['proof'] = 'yeah'
-    raise Exception()
+    # raise Exception()
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):
