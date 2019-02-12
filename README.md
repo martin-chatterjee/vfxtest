@@ -51,7 +51,7 @@ Therefore I'm fully aware that I probably know barely enough to be dangerous
 right now. :)
 
 If there already happens to be an existing go-to solution for this problem out
-there in the interwebs, I'd love to know about it!
+there on the interwebs, I'd love to know about it!
 
 Also if any part of this could be improved (or makes your eyes bleed) please
 give me a heads up! :)
@@ -59,5 +59,5 @@ give me a heads up! :)
 
 ### That said, I hope that somebody will get some benefit out of this!
 
-Every attempt to encourage **maintaining a test suite** easier in **VFX** is
+Every attempt to encourage **maintaining a test suite** in **VFX** is
 valuable, as far as I'm concerned... :)
