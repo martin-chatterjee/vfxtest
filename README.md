@@ -59,5 +59,5 @@ give me a heads up! :)
 
 ### That said, I hope that somebody will get some benefit out of this!
 
-Every attempt to encourage **maintaining a test suite** in **VFX** is
+Everything that encourages and helps **maintaining a test suite** in **VFX** is
 valuable, as far as I'm concerned... :)
