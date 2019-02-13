@@ -1,4 +1,4 @@
-# vfx-test
+# vfxtest
 
 [<p align="center">**How do I use this?**</p>](./docs/USAGE.md)
 
@@ -32,9 +32,9 @@ When a **Python codebase** is used inside multiple contexts that do not know
 each other it is quite difficult to gather **accurate metrics** about the
 **overall test coverage**.
 
-#### And this is where ``vfx-test`` tries to fill the gap.
+#### And this is where ``vfxtest`` tries to fill the gap.
 
-**``vfx-test``** is just a thin wrapper around ``unittest``, ``mock`` and
+**``vfxtest``** is just a thin wrapper around ``unittest``, ``mock`` and
 ``coverage`` that let's you run a **test suite for each context** and then
 presents the **combined code coverage** of all those tests.
 <br><br>
