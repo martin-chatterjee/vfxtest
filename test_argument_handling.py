@@ -84,7 +84,6 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                                           os.sep,
                                                           'other.prefs'))
         self.assertEqual(result_a['limit'], 13)
-        self.assertEqual(result_a['filter_tokens'], ['foo', 'bar', 'baz'])
 
         self.assertEqual(result_a, result_b)
 
@@ -112,31 +111,21 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test07_collectSettings_nonexistent_test_output_parent_folder_raises_SystemExit(self):
+    def test07_collectSettings_nonexistent_test_root_parent_folder_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
             result = vfxtest.collectSettings(['--prefs',
-                                              './test_output-non-existent-parent-folder.prefs'])
+                                              './test_root-non-existent-parent-folder.prefs'])
 
     # -------------------------------------------------------------------------
-    def test08_collectSettings_nonexistent_test_output_folder_gets_created(self):
+    def test08_collectSettings_nonexistent_test_root_folder_gets_created(self):
 
         if os.path.exists('./remove_me'):
             os.rmdir('./remove_me')
 
         result = vfxtest.collectSettings(['--prefs',
-                                          './test_output-create-folder.prefs'])
+                                          './test_root-create-folder.prefs'])
 
         self.assertTrue(os.path.exists('./remove_me'))
-        os.rmdir('./remove_me')
 
-    # -------------------------------------------------------------------------
-    def test00008_collectSettings_falls_back_to_prefs_in_parent_folder(self):
 
-        cwd = os.getcwd()
-        os.chdir('./python2.x')
-        result = vfxtest.collectSettings([])
-        self.assertEqual(result['prefs'], '{}{}{}'.format(cwd,
-                                                          os.sep,
-                                                          'test.prefs'))
-        os.chdir('..')

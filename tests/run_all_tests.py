@@ -12,12 +12,10 @@ import coverage
 
 # -----------------------------------------------------------------------------
 def main(folder_path, failfast, print_to_stdout, include_test_files):
-
-    # # clean up all data files if clear == True
-    # for data_file in glob.glob('./.coverage*'):
-    #     os.remove(data_file)
-
-
+    """
+    """
+    sys.path.append(os.path.abspath('./test_setting'))
+    print('>>> ' + sys.path[-1])
     omit = []
     if not include_test_files:
         omit.append('test*.py')
@@ -35,26 +33,8 @@ def main(folder_path, failfast, print_to_stdout, include_test_files):
 
     result = runner.run(suite)
 
-    # stats = [0, 0, 0]
-    # for item in suite:
-    #     print('-'*70)
-    #     result = runner.run(item)
-    #     stats[0] += result.testsRun
-    #     stats[1] += len(result.errors)
-    #     stats[2] += len(result.failures)
-
     cov.stop()
     cov.save()
-
-    # print('')
-    # print('-'*70)
-    # print('STATISTICS')
-    # print('')
-    # print('test run: {}   errors: {}   failures: {}'.format(result.testsRun,
-    #                                                         len(result.errors),
-    #                                                         len(result.failures)))
-    # print('-'*70)
-
     cov.report()
     cov.html_report(directory='_html_coverage')
 

@@ -1,6 +1,30 @@
 # this is a json file that also allows comments
 # -----------------------------------------------------------------------------
 {
-    # both inside the structure
-    "test_root" : "C:/DATA/TEMP/test_root"  # as well as in line
+    # 'test_output' is essentially the temp storage folder for this test suite.
+    # If it does not exist it will get created.
+    # It's parent folder however must already exist!
+    "test_output" : "./test_output",
+
+    # --------------------------------
+    "contexts" :
+    {
+        # ----------------------------
+        "python2.x" :
+        [
+            "c:/python27/python.exe"
+        ],
+        # ----------------------------
+        "python3.x" :
+        [
+            "c:/python37/python.exe"
+        ],
+        # ----------------------------
+        "python" :
+        [
+            "c:/python37/python.exe",
+            "c:/python27/python.exe"
+        ]
+    }
+
 }

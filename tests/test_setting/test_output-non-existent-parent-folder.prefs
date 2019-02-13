@@ -2,5 +2,5 @@
 # -----------------------------------------------------------------------------
 {
     # both inside the structure
-    "test_root" : "remove_me"
+    "test_output" : "./non/existing/folder"
 }
