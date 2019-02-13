@@ -6,7 +6,7 @@
 import sys
 import os
 import argparse
-
+import json
 
 # -----------------------------------------------------------------------------
 def main(args):
@@ -20,7 +20,7 @@ def main(args):
 
 
 # -----------------------------------------------------------------------------
-def _parseArgs(args):
+def _parseArgs(args=[]):
     """
     """
 
@@ -41,7 +41,7 @@ def _parseArgs(args):
                         help='Runs all test suites in all subfolders of '
                              'the current working directory.')
     parser.add_argument('-c', '--clear', type=__stringToBool, default=None,
-                        help='Clears old coverage reports.')
+                        help='Clears existing coverage reports.')
     parser.add_argument('-f', '--failfast', type=__stringToBool, default=None,
                         help='Stops execution of test suite on first error.')
     parser.add_argument('-t', '--target', metavar='', type=str, default='.',
@@ -77,8 +77,9 @@ def _parseArgs(args):
     try:
         _readPrefs(settings)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         parser.error('Invalid .prefs file: {}'.format(settings['prefs']))
-
 
     return settings
 
@@ -89,8 +90,10 @@ def _readPrefs(settings):
     # TODO: read out prefs
     #       store everything in settings
     #       raise exception on error
-    settings['proof'] = 'yeah'
-    # raise Exception()
+    with open(settings['prefs'], 'r') as f:
+        prefs = json.load(f)
+    settings.update(prefs)
+    # raise ArgumentError('foo')
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):
@@ -105,5 +108,5 @@ def __stringToBool(value):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main(sys.argv[1:]) # pragma: no cover
 
