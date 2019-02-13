@@ -3,16 +3,57 @@
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
-import sys
-import os
 import argparse
 import json
+import os
+import sys
+import traceback
+
+"""
+
+USAGE
+-----
+
+- run 'vfxtest' in any folder:
+    - all tests directly inside this folder will be run with the current
+      python interpreter
+    - all subfolders that contain tests will be found:
+        - based on the name of the subfolder and the settings all those
+          tests will be run in spawned test run
+    - at the end all coverage information will get combined and reported.
+
+
+- defaults for main 'vfxtest' process:
+    clear=True, failfast=True
+
+- defaults for child processes:
+    clear=True, failfast=True
+
+- prefs file is assumed in the current folder
+
+- test_root is assumed to be './test_root' (can be set in prefs file)
+
+
+EXAMPLE USAGES
+--------------
+
+    vfxtest.py
+
+    vfxtest.py --target ./subfolder
+
+    vfxtest.py --failfast false --limit 12
+
+    vfxtest.py -t ./python 03
+
+"""
+
 
 # -----------------------------------------------------------------------------
 def main(args):
     """
     """
-    settings = _parseArgs(args)
+    # collect and validate settings from arguments and preferences
+    settings = collectSettings(args)
 
     # DBG
     for key in settings:
@@ -20,80 +61,72 @@ def main(args):
 
 
 # -----------------------------------------------------------------------------
-def _parseArgs(args=[]):
+def collectSettings(args=[]):
     """
     """
-
-    # TODO
-    #       root folder name tests and run-all=None: --> run-all=True
-    #       root folder name anything else and run-all=None: --> run-all=False
-
-    #       explicit prefs is None
-    #           try to find prefs file in cwd: --> use it
-    #           try to find prefs file in parent folder: --> use it
-
-
+    # define arguments
     parser = argparse.ArgumentParser(description='Run test suite(s):')
 
-    parser.add_argument('filter_tokens', nargs='*', type=str,
-                        help='specify tokens that filter down the test files by name.')
-    parser.add_argument('-ra', '--run-all', type=__stringToBool, default=None,
-                        help='Runs all test suites in all subfolders of '
-                             'the current working directory.')
-    parser.add_argument('-c', '--clear', type=__stringToBool, default=None,
-                        help='Clears existing coverage reports.')
-    parser.add_argument('-f', '--failfast', type=__stringToBool, default=None,
-                        help='Stops execution of test suite on first error.')
     parser.add_argument('-t', '--target', metavar='', type=str, default='.',
                         help='target folder path (defaults to current working directory)')
-    parser.add_argument('-p', '--prefs', metavar='', type=str, default='./vfxtest.prefs',
+    parser.add_argument('-f', '--failfast', type=__stringToBool, default=True,
+                        help='Stops execution of test suite on first error.')
+    parser.add_argument('-p', '--prefs', metavar='', type=str, default='./test.prefs',
                         help="path of the .prefs file to use. "
                              ""
-                             "Defaults to 'vfxtest.prefs' in:"
+                             "Defaults to 'test.prefs' in:"
                              "    - the current working directory"
                              "    - the one root dir of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
                         help='limits the number of test files that get executed.')
+    parser.add_argument('filter_tokens', nargs='*', type=str,
+                        help='specify tokens that filter down the test files by name.')
 
+    # receive valid arguments as dictionary
     settings = vars(parser.parse_args(args))
 
-    # set sensible defaults based the 'run-all' state
-    # (respects explicit user argument values)
-    if settings['failfast'] is None:
-        settings['failfast'] = True
-
-    if settings['clear'] is None:
-        if settings['run_all']:
-            settings['clear'] = True
-        else:
-            settings['clear'] = False
-
-
-    settings['cwd'] = os.getcwd()
-    settings['prefs'] = os.path.abspath(settings['prefs'])
-    settings['target'] = os.path.abspath(settings['target'])
-
-    # read out prefs file
-    try:
-        _readPrefs(settings)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        parser.error('Invalid .prefs file: {}'.format(settings['prefs']))
+    # validate preferences and add to settings
+    _addValidatedPrefsToSettings(settings)
 
     return settings
 
 # -----------------------------------------------------------------------------
-def _readPrefs(settings):
+def _addValidatedPrefsToSettings(settings):
     """
     """
-    # TODO: read out prefs
-    #       store everything in settings
-    #       raise exception on error
-    with open(settings['prefs'], 'r') as f:
-        prefs = json.load(f)
-    settings.update(prefs)
-    # raise ArgumentError('foo')
+    try:
+        # read out prefs and strip comments
+        with open(settings['prefs'], 'r') as f:
+            lines = []
+            for line in f.readlines():
+                tokens = line.split('#')
+                lines.append(tokens[0])
+        # interpret as json and add to settings
+        prefs = json.loads('\n'.join(lines))
+        settings.update(prefs)
+
+        settings['cwd'] = os.getcwd()
+        if not 'test_root' in settings:
+            settings['test_root'] = './test_root'
+
+        # make all paths absolute
+        for key in ['prefs', 'target', 'test_root']:
+            settings[key] = os.path.abspath(settings[key])
+
+        # create 'test_root' if needed, but never create it's parent folder
+        test_root = settings['test_root']
+        parent_folder = os.path.dirname(test_root)
+        if not os.path.exists(parent_folder):
+            raise FileNotFoundError('Folder does not exist:\n'
+                                    '{}'.format(parent_folder))
+        if not os.path.exists(test_root):
+            os.makedirs(test_root)
+
+    except Exception as e:
+        print('Failed to read and conform preferences:'
+               '\n\n{}'
+               '\n\n{}'.format(e, traceback.format_exc()))
+        raise(SystemExit)
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):

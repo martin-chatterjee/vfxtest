@@ -1,0 +1,6 @@
+# this is a json file that also allows comments
+# -----------------------------------------------------------------------------
+{
+    # both inside the structure
+    "test_root" : "C:/DATA/TEMP/test_root"  # as well as in line
+}

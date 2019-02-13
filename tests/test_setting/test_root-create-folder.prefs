@@ -1,0 +1,6 @@
+# this is a json file that also allows comments
+# -----------------------------------------------------------------------------
+{
+    # both inside the structure
+    "test_root" : "remove_me"
+}

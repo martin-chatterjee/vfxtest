@@ -26,64 +26,60 @@ class ArgumentHandlingTestCase(unittest.TestCase):
     def setUp(self):
         """
         """
+        self.cwd = os.getcwd()
+        os.chdir('./test_setting')
     # -------------------------------------------------------------------------
     def tearDown(self):
         """
         """
+        os.chdir(self.cwd)
 
 
     # -------------------------------------------------------------------------
-    def test01__parseArgs_help_raises_SystemError(self):
+    def test01_collectSettings_help_raises_SystemError(self):
 
         with self.assertRaises(SystemExit):
-            result = vfxtest._parseArgs(['--help'])
+            result = vfxtest.collectSettings(['--help'])
 
     # -------------------------------------------------------------------------
-    def test02__parseArgs_unknown_argument_raises_SystemError(self):
+    def test02_collectSettings_unknown_argument_raises_SystemError(self):
 
         with self.assertRaises(SystemExit):
-            result = vfxtest._parseArgs(['--doesnotexist'])
+            result = vfxtest.collectSettings(['--doesnotexist'])
 
     # -------------------------------------------------------------------------
-    def test03__parseArgs_returns_default_args(self):
+    def test03_collectSettings_returns_default_args(self):
 
-        result = vfxtest._parseArgs()
+        result = vfxtest.collectSettings()
 
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(result['filter_tokens'], [])
-        self.assertEqual(result['run_all'], None)
-        self.assertEqual(result['clear'], False)
-        self.assertEqual(result['failfast'], True)
         self.assertEqual(result['target'], os.getcwd())
+        self.assertEqual(result['failfast'], True)
         self.assertEqual(result['prefs'], os.sep.join([result['target'],
-                                                       'vfxtest.prefs']))
-        self.assertEqual(result['target'], result['cwd'])
+                                                       'test.prefs']))
         self.assertEqual(result['limit'], 0)
+        self.assertEqual(result['filter_tokens'], [])
         self.assertEqual(result['cwd'], os.getcwd())
 
     # -------------------------------------------------------------------------
-    def test04__parseArgs_explicit_values_for_clear_and_failfast_get_respected(self):
+    def test04_collectSettings_explicit_values_for_clear_and_failfast_get_respected(self):
 
-        result_a = vfxtest._parseArgs(['--run-all', 'True',
-                                       '--clear', 'True',
+        result_a = vfxtest.collectSettings(['--target', './subfolder',
                                        '--failfast', 'False',
-                                       '--target', './subfolder',
                                        '--prefs', './other.prefs',
-                                       '--limit', '13'])
+                                       '--limit', '13',
+                                       'foo', 'bar', 'baz'])
 
-        result_b = vfxtest._parseArgs(['-ra', 'True',
-                                       '-c', 'True',
+        result_b = vfxtest.collectSettings(['-t', './subfolder',
                                        '-f', 'False',
-                                       '-t', './subfolder',
                                        '-p', './other.prefs',
-                                       '-l', '13'])
+                                       '-l', '13',
+                                       'foo', 'bar', 'baz'])
 
-        self.assertEqual(result_a['run_all'], True)
-        self.assertEqual(result_a['clear'], True)
-        self.assertEqual(result_a['failfast'], False)
         self.assertEqual(result_a['target'], '{}{}{}'.format(os.getcwd(),
                                                            os.sep,
                                                            'subfolder'))
+        self.assertEqual(result_a['failfast'], False)
         self.assertEqual(result_a['prefs'], '{}{}{}'.format(os.getcwd(),
                                                           os.sep,
                                                           'other.prefs'))
@@ -92,40 +88,44 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertEqual(result_a, result_b)
 
     # -------------------------------------------------------------------------
-    def test05__parseArgs_clear_is_False_if_not_set_explictely(self):
-
-        result = vfxtest._parseArgs()
-        self.assertEqual(result['clear'], False)
-
-    # -------------------------------------------------------------------------
-    def test06__parseArgs_clear_is_True_if_not_set_explictely_and_run_all_is_True(self):
-
-        result = vfxtest._parseArgs(['--run-all', 'True'])
-        self.assertEqual(result['clear'], True)
-
-        result = vfxtest._parseArgs(['--run-all', 'True', '--clear', 'False'])
-        self.assertEqual(result['clear'], False)
-
-    # -------------------------------------------------------------------------
-    def test07__parseArgs_invalid_boolean_string_raises_SystemExit(self):
+    def test05_collectSettings_invalid_boolean_string_raises_SystemExit(self):
 
         true_boolean_strings = ['true', 'True', 'yes', 'y', '1']
         for item in true_boolean_strings:
-            result = vfxtest._parseArgs(['--clear', item])
-            self.assertEqual(result['clear'], True)
+            result = vfxtest.collectSettings(['--failfast', item])
+            self.assertEqual(result['failfast'], True)
 
         false_boolean_strings = ['false', 'False', 'no', 'n', '0']
         for item in false_boolean_strings:
-            result = vfxtest._parseArgs(['--clear', item])
-            self.assertEqual(result['clear'], False)
+            result = vfxtest.collectSettings(['--failfast', item])
+            self.assertEqual(result['failfast'], False)
 
         with self.assertRaises(SystemExit):
-            result = vfxtest._parseArgs(['--clear', 'Nope'])
+            result = vfxtest.collectSettings(['--failfast', 'Nope'])
 
     # -------------------------------------------------------------------------
-    def test08__parseArgs_invalid_or_nonexistent_prefs_file_raises_SystemExit(self):
+    def test06_collectSettings_invalid_or_nonexistent_prefs_file_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
-            result = vfxtest._parseArgs(['--prefs', 'does_not_exist.prefs'])
+            result = vfxtest.collectSettings(['--prefs', 'does_not_exist.prefs'])
+
+
+    # -------------------------------------------------------------------------
+    def test07_collectSettings_nonexistent_test_root_parent_folder_raises_SystemExit(self):
+
+        with self.assertRaises(SystemExit):
+            result = vfxtest.collectSettings(['--prefs',
+                                              './test_root-non-existent-parent-folder.prefs'])
+
+    # -------------------------------------------------------------------------
+    def test08_collectSettings_nonexistent_test_root_folder_gets_created(self):
+
+        if os.path.exists('./remove_me'):
+            os.rmdir('./remove_me')
+
+        result = vfxtest.collectSettings(['--prefs',
+                                          './test_root-create-folder.prefs'])
+
+        self.assertTrue(os.path.exists('./remove_me'))
 
 
