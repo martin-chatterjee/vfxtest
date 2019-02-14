@@ -86,12 +86,12 @@ class RunTestSuiteTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(cov_file_2))
 
     # -------------------------------------------------------------------------
-    def test04_runTestSuite_wrapper_script_not_found_throws_FileNotFoundError(self):
+    def test04_runTestSuite_wrapper_script_not_found_raises_OSError(self):
 
         settings = vfxtest.collectSettings()
         settings['context'] = 'context_without_wrapper_script'
 
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(OSError):
             vfxtest.runTestSuite(settings=settings)
 
 

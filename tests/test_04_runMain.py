@@ -37,18 +37,7 @@ class RunMainTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test01_runMain_works_as_expected(self):
-
-        returnvalue = vfxtest.main()
-
-        proof = vfxtest.collectSettings()
-        vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
-        self.assertEqual(proof['count_files_run'], 4)
-        self.assertEqual(proof['count_tests_run'], 12)
-        self.assertEqual(proof['count_errors'], 0)
-
-    # -------------------------------------------------------------------------
-    def test02_runMain_filtered_works_as_expected(self):
+    def test01_runMain_filtered_works_as_expected(self):
 
         returnvalue = vfxtest.main(['01', '03'])
 
@@ -59,7 +48,7 @@ class RunMainTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test03_runMain_limit_works_as_expected(self):
+    def test02_runMain_limit_works_as_expected(self):
 
         returnvalue = vfxtest.main(['--limit', '2'])
         print(returnvalue)
@@ -70,7 +59,7 @@ class RunMainTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test04_runMain_with_empty_filtered_result_works_as_expected(self):
+    def test03_runMain_with_empty_filtered_result_works_as_expected(self):
 
         returnvalue = vfxtest.main(['asdfg',])
         print(returnvalue)
@@ -79,4 +68,16 @@ class RunMainTestCase(unittest.TestCase):
         self.assertEqual(proof['count_files_run'], 0)
         self.assertEqual(proof['count_tests_run'], 0)
         self.assertEqual(proof['count_errors'], 0)
+
+    # -------------------------------------------------------------------------
+    def test04_runMain_works_as_expected(self):
+
+        returnvalue = vfxtest.main()
+
+        proof = vfxtest.collectSettings()
+        vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
+        self.assertEqual(proof['count_files_run'], 4)
+        self.assertEqual(proof['count_tests_run'], 12)
+        self.assertEqual(proof['count_errors'], 0)
+
 

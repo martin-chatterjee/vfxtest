@@ -135,10 +135,11 @@ def runTestSuite(settings):
             _storeSettingsInEnv(ctxt_settings)
             wrapper = _getWrapperPath(ctxt_settings)
             executable = _getExecutable(ctxt_settings)
+            path_to_myself = _getPathToMyself()
 
             args = [wrapper,
                     executable,
-                    __file__]
+                    path_to_myself]
 
             print('')
             print('Wrapper call:')
@@ -227,6 +228,18 @@ def _getExecutable(settings):
     context = settings['context']
     context_details = settings['context_details'][context]
     return context_details['executable']
+
+# -----------------------------------------------------------------------------
+def _getPathToMyself():
+    """
+    """
+    # for Python 2 and 3 compatibility we need to ensure a .py suffix
+    path_tokens = __file__.split('.')
+    path_tokens[-1] = 'py'
+    path_to_myself = '.'.join(path_tokens)
+
+    return path_to_myself
+
 # -----------------------------------------------------------------------------
 def _getWrapperPath(settings):
     """
@@ -242,7 +255,7 @@ def _getWrapperPath(settings):
                                    wrapper_name)
 
     if not os.path.exists(wrapper_path):
-        raise FileNotFoundError('Could not find wrapper script:'
+        raise OSError('Could not find wrapper script:'
                                 '\n{}'.format(wrapper_path))
 
     return wrapper_path
@@ -432,7 +445,7 @@ def _getSettings(arg_parser, args):
         test_output = settings['test_output']
         parent_folder = os.path.dirname(test_output)
         if not os.path.exists(parent_folder):
-            raise FileNotFoundError('Folder does not exist:\n'
+            raise OSError('Folder does not exist:\n'
                                     '{}'.format(parent_folder))
         if not os.path.exists(test_output):
             os.makedirs(test_output)
