@@ -103,7 +103,7 @@ class RunNativeTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test07_runNative_in_subfolder_works_as_expected(self):
 
-        settings = vfxtest.collectSettings(['--target', './python2.x'])
+        settings = vfxtest.collectSettings(['--target', './python'])
 
         vfxtest.runNative(settings=settings)
 

@@ -135,7 +135,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
     def test09_collectSettings_falls_back_to_prefs_in_parent_folder(self):
 
         cwd = os.getcwd()
-        os.chdir('./python2.x')
+        os.chdir('./python')
         result = vfxtest.collectSettings([])
         self.assertEqual(result['prefs'], '{}{}{}'.format(cwd,
                                                           os.sep,

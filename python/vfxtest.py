@@ -22,6 +22,13 @@ import coverage
 NEXT STEPS
 ----------
 
+- build and test all our wrapper scripts:
+    mayapy
+    maya
+    hython
+    houdini
+
+
 - move --settings into environment variable
 - make sure encode/decode plays nice
 - refactor main() once more
@@ -78,13 +85,8 @@ def main(args=[]):
     # collect and validate settings from arguments and preferences
     settings = collectSettings(args)
 
-    print('===== LIMIT {}'.format(settings['limit']))
-    print('===== COUNT {}'.format(settings['count_files_run']))
-
     # run test suite in current folder
     runTestSuite(settings)
-    print('===== LIMIT {}'.format(settings['limit']))
-    print('===== COUNT {}'.format(settings['count_files_run']))
 
     if settings['subprocess'] is False:
         # run all child context test suites
@@ -142,7 +144,14 @@ def runTestSuite(settings):
             print('Wrapper call:')
             print('-------------')
             print('        ' + ' '.join(args))
+            print('target folder:')
+            print('-------------')
+            print('        ' + ctxt_settings['target'])
+            print('target context:')
+            print('-------------')
+            print('        ' + ctxt_settings['context'])
             print('')
+
 
             proc = subprocess.Popen(args=args,
                                     bufsize=0,
@@ -269,8 +278,6 @@ def runNative(settings, use_coverage=True):
     runner = unittest.TextTestRunner(failfast=settings['failfast'],
                                      buffer=False)
     # run tests file by file
-    print('SAFETY:   {}'.format(settings['count_files_run']))
-    print('LIMIT:    {}'.format(settings['limit']))
     for item in suite:
         if (settings['limit'] > 0 and
                 settings['count_files_run'] >= settings['limit']):

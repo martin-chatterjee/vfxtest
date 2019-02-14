@@ -43,8 +43,8 @@ class RunMainTestCase(unittest.TestCase):
 
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
-        self.assertEqual(proof['count_files_run'], 3)
-        self.assertEqual(proof['count_tests_run'], 9)
+        self.assertEqual(proof['count_files_run'], 4)
+        self.assertEqual(proof['count_tests_run'], 12)
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
@@ -54,8 +54,8 @@ class RunMainTestCase(unittest.TestCase):
 
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
-        self.assertEqual(proof['count_files_run'], 2)
-        self.assertEqual(proof['count_tests_run'], 6)
+        self.assertEqual(proof['count_files_run'], 3)
+        self.assertEqual(proof['count_tests_run'], 9)
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
@@ -70,7 +70,7 @@ class RunMainTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test03_runMain_with_empty_filtered_result_works_as_expected(self):
+    def test04_runMain_with_empty_filtered_result_works_as_expected(self):
 
         returnvalue = vfxtest.main(['asdfg',])
         print(returnvalue)
