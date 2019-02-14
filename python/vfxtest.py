@@ -6,7 +6,10 @@
 import argparse
 import json
 import os
+import copy
+import platform
 import glob
+import subprocess
 import sys
 import traceback
 import unittest
@@ -19,10 +22,15 @@ import coverage
 NEXT STEPS
 ----------
 
+- move --settings into environment variable
+- make sure encode/decode plays nice
+- refactor main() once more
+
+
 *** - serialize full settings dict and pass it in as a command line argument
 
 - append executable index to coverage suffix --> .coverage.python.0
-- full test case with two separate child contexts
+- full test case with two separate child context_details
 
 
 
@@ -69,37 +77,141 @@ def main(args):
     """
     # collect and validate settings from arguments and preferences
     settings = collectSettings(args)
+    # run test suite in current folder
+    runTestSuite(settings=settings)
 
-    # TODO: is this even needed?
-    # # clear old coverage file
-    # for data_file in glob.glob('{}/.coverage*'.format(settings['test_output'])):
-    #     os.remove(data_file)
+    if settings['subprocess'] is False:
+        # run all child context test suites
+        runChildTestSuites(settings=settings)
+        # combine coverages
+        combineCoverages(settings=settings)
 
-    # determine current context
-    context = resolveContext(settings)
-    print('context:  {}'.format(context))
-    # run all native tests directly inside this folder
-    runTests(target=settings['target'], settings=settings, context=context)
+# -----------------------------------------------------------------------------
+def runTestSuite(settings):
 
-    # run all child context test suites
-    # runChildContextTests(target=settings['cwd'], settings=settings)
+    if settings['context'] == 'native':
+        runNative(settings)
+        return
 
-    # combine coverages
-    combineCoverages(settings=settings)
+    for context in _resolveContextsToRun(settings):
+
+        ctxt_settings = copy.deepcopy(settings)
+        ctxt_settings['context'] = context
+        wrapper = _getWrapperPath(ctxt_settings)
+        executable = _getExecutable(ctxt_settings)
+        json_settings = json.dumps(ctxt_settings)
+        json_settings = json_settings.replace('"', '\\"')
+        json_settings = '"{}"'.format(json_settings)
+
+        args = [wrapper,
+                executable,
+                __file__,
+                json_settings]
+
+        print(' '.join(args))
+        proc = subprocess.Popen(args=args,
+                                bufsize=0,
+                                shell=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+        while True:
+            line = proc.stdout.readline().decode('utf-8').rstrip()
+            if not line:
+                break
+            print(line)
+
+# -----------------------------------------------------------------------------
+def _resolveContextsToRun(settings):
+    """
+    """
+    context = settings['context']
+    context_details = settings['context_details'][context]
+    if 'nested_contexts' in context_details:
+        return context_details['nested_contexts']
+
+    return [context,]
+
+# -----------------------------------------------------------------------------
+def _getExecutable(settings):
+    """
+    """
+    context = settings['context']
+    context_details = settings['context_details'][context]
+    return context_details['executable']
+# -----------------------------------------------------------------------------
+def _getWrapperPath(settings):
+    """
+    """
+    # use bash for every os execpt Windows
+    suffix = '.sh'
+    if platform.system() == 'Windows':
+        suffix = '.cmd'
+
+    wrapper_name = '{}{}'.format(settings['context'], suffix)
+    wrapper_path = '{}{}{}'.format(settings['wrapper_scripts'],
+                                   os.sep,
+                                   wrapper_name)
+
+    if not os.path.exists(wrapper_path):
+        raise FileNotFoundError('Could not find wrapper script:'
+                                '\n{}'.format(wrapper_path))
+
+    return wrapper_path
+
+# -----------------------------------------------------------------------------
+def runChildTestSuites(settings):
+    """
+    """
+    # TODO
 
 
-    # # DBG
-    # for key in settings:
-    #     print('{} :    {}'.format(key.ljust(15), settings[key]))
+
+# -----------------------------------------------------------------------------
+def runNative(settings, use_coverage=True):
+    """
+    """
+    if use_coverage:
+        cov = _startCoverage(settings)
+
+    suite = _discoverTests(settings)
+
+    runner = unittest.TextTestRunner(failfast=settings['failfast'],
+                                     buffer=False)
+    # run tests file by file
+    for item in suite:
+        print('-'*70)
+        result = runner.run(item)
+        settings['count_run'] += result.testsRun
+        settings['count_errors'] += len(result.errors)
+        settings['count_failures'] += len(result.failures)
+
+    if use_coverage:
+        # --> can't be covered:
+        #     coverage is now running inside of another coverage run
+        _stopCoverage(settings, cov) # pragma: no cover
+
+# -----------------------------------------------------------------------------
+def collectSettings(args=[]):
+    """
+    """
+    # define arguments
+    arg_parser = _defineArguments()
+    # receive valid arguments as dictionary
+    settings = vars(arg_parser.parse_args(args))
+    # validate preferences and add to settings
+    _addValidatedPrefsToSettings(settings)
+
+    return settings
+
 
 # -----------------------------------------------------------------------------
 def resolveContext(settings):
     """
     """
     context = os.path.basename(settings['target'])
-    if not context in settings['contexts']:
+    if not context in settings['context_details']:
         context = 'native'
-    return context
+    settings['context'] = context
 
 # -----------------------------------------------------------------------------
 def combineCoverages(settings):
@@ -113,75 +225,31 @@ def combineCoverages(settings):
     cov.report()
     cov.html_report(directory='{}/_coverage_html'.format(test_output))
 
-# -----------------------------------------------------------------------------
-def runChildContextTests(target, settings):
-    """
-    """
-    for item in os.listdir(target):
-        if item in settings['contexts']:
-            item_path = '{}{}{}'.format(target, os.sep, item)
-            if os.path.isdir(item_path):
-                executables = settings['contexts'][item]
-                for executable in executables:
-                    commandline = [executable,]
-                    commandline.append(__file__)
-                    commandline.append('--target')
-                    commandline.append(item_path)
-                    commandline.append('--prefs')
-                    commandline.append(settings['prefs'])
-                    commandline.append('--test')
-                    commandline.append(settings['prefs'])
-                    print(' '.join(commandline))
+# # -----------------------------------------------------------------------------
+# def runChildContextTests(target, settings):
+#     """
+#     """
+#     for item in os.listdir(target):
+#         if item in settings['context_details']:
+#             item_path = '{}{}{}'.format(target, os.sep, item)
+#             if os.path.isdir(item_path):
+#                 executables = settings['context_details'][item]
+#                 for executable in executables:
+#                     commandline = [executable,]
+#                     commandline.append(__file__)
+#                     commandline.append('--target')
+#                     commandline.append(item_path)
+#                     commandline.append('--prefs')
+#                     commandline.append(settings['prefs'])
+#                     commandline.append('--test')
+#                     commandline.append(settings['prefs'])
+#                     print(' '.join(commandline))
 
-
-
-# -----------------------------------------------------------------------------
-def runTests(target, settings, context='native', use_coverage=True):
-    """
-    """
-    if use_coverage:
-        omit = []
-        # omit myself
-        omit.append('*vfxtest.py')
-        # omit all test files
-        if not settings['include_test_files']:
-            omit.append(settings['test_file_pattern'])
-
-        data_file='{}/.coverage'.format(settings['test_output'])
-        cov = coverage.Coverage(omit=omit,
-                                data_file=data_file,
-                                data_suffix=context)
-        cov.start()
-
-    patterns = [settings['test_file_pattern'],]
-    for item in settings['filter_tokens']:
-        patterns.append('*{}*'.format(item))
-
-    # discover all tests and run them
-    loader = FilteredTestLoader()
-    suite = loader.discover(target, pattern=patterns)
-
-    runner = unittest.TextTestRunner(failfast=settings['failfast'],
-                                     buffer=False)
-    # result = runner.run(suite)
-    for item in suite:
-        print('-'*70)
-        result = runner.run(item)
-        settings['count_run'] += result.testsRun
-        settings['count_errors'] += len(result.errors)
-        settings['count_failures'] += len(result.failures)
-
-    if use_coverage:
-        cov.stop() # pragma: no cover
-        cov.save()
-        cov.report()
-        cov.html_report(directory='{}/_coverage_html.{}'.format(settings['test_output'], context))
 
 # -----------------------------------------------------------------------------
-def collectSettings(args=[]):
+def _defineArguments():
     """
     """
-    # define arguments
     parser = argparse.ArgumentParser(description='Run test suite(s):')
 
     parser.add_argument('-t', '--target', metavar='', type=str, default='.',
@@ -201,13 +269,51 @@ def collectSettings(args=[]):
     parser.add_argument('filter_tokens', nargs='*', type=str,
                         help='specify tokens that filter down the test files by name.')
 
-    # receive valid arguments as dictionary
-    settings = vars(parser.parse_args(args))
+    return parser
 
-    # validate preferences and add to settings
-    _addValidatedPrefsToSettings(settings)
+# -----------------------------------------------------------------------------
+def _startCoverage(settings):
 
-    return settings
+    omit = []
+    # omit myself
+    omit.append('*vfxtest.py')
+    # omit all test files
+    if not settings['include_test_files']:
+        omit.append(settings['test_file_pattern'])
+
+    data_file='{}/.coverage'.format(settings['test_output'])
+    cov = coverage.Coverage(omit=omit,
+                            data_file=data_file,
+                            data_suffix=settings['context'])
+    cov.start()
+    # --> can't be covered:
+    #     coverage is now running inside of another coverage run
+    return cov # pragma: no cover
+
+# -----------------------------------------------------------------------------
+def _discoverTests(settings):
+    """
+    """
+    patterns = [settings['test_file_pattern'],]
+    for item in settings['filter_tokens']:
+        patterns.append('*{}*'.format(item))
+
+    loader = FilteredTestLoader()
+    suite = loader.discover(settings['target'], pattern=patterns)
+
+    return suite
+
+# -----------------------------------------------------------------------------
+def _stopCoverage(settings, cov, report=True):
+    """
+    """
+    # --> can't be covered:
+    #     coverage is now running inside of another coverage run
+    cov.stop() # pragma: no cover
+
+    cov.save()
+    if report:
+        cov.report()
 
 # -----------------------------------------------------------------------------
 def _addValidatedPrefsToSettings(settings):
@@ -216,18 +322,15 @@ def _addValidatedPrefsToSettings(settings):
     try:
         # recover passed in settings if they are present
         if settings['settings'] is not None:
-            recovered_settings = json.loads(settings['settings'])
-            settings.clear()
-            settings.update(recovered_settings)
-        # otherwise use prefs file
+            _recoverSettings(settings)
         else:
             _readPrefs(settings)
 
         # some inits
+        resolveContext(settings)
         settings['count_run'] = 0
         settings['count_errors'] = 0
         settings['count_failures'] = 0
-        settings['cwd'] = os.getcwd()
 
         # make all paths absolute
         for key in ['prefs', 'target', 'test_output']:
@@ -244,9 +347,18 @@ def _addValidatedPrefsToSettings(settings):
 
     except Exception as e:
         print('Failed to read and conform preferences:'
-               '\n\n{}'
-               '\n\n{}'.format(e, traceback.format_exc()))
+              '\n{}\n{}'.format(e, traceback.format_exc()))
         raise(SystemExit)
+
+# -----------------------------------------------------------------------------
+def _recoverSettings(settings):
+    """
+    """
+    recovered_settings = json.loads(settings['settings'])
+    settings.clear()
+    settings.update(recovered_settings)
+
+    settings['subprocess'] = True
 
 # -----------------------------------------------------------------------------
 def _readPrefs(settings):
@@ -275,8 +387,18 @@ def _readPrefs(settings):
         settings['test_file_pattern'] = 'test*.py'
     if not 'test_output' in settings:
         settings['test_output'] = './test_output'
-    if not 'contexts' in settings:
-        settings['contexts'] = {}
+    if not 'context_details' in settings:
+        settings['context_details'] = {}
+    if not 'wrapper_scripts' in settings:
+        wrapper_scripts = '{}{}wrapper_scripts'.format(os.path.dirname(__file__), os.sep)
+        settings['wrapper_scripts'] = wrapper_scripts
+
+    settings['cwd'] = os.getcwd()
+
+    settings['subprocess'] = False
+
+
+
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):

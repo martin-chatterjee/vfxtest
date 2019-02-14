@@ -1,30 +1,38 @@
-# this is a json file that also allows comments
 # -----------------------------------------------------------------------------
+# vfxtest prefs file
+# -----------------------------------------------------------------------------
+# (This is essentially just a json file that supports comments)
+#
 {
-    # 'test_output' is essentially the temp storage folder for this test suite.
+    # temp storage folder for this test suite.
     # If it does not exist it will get created.
-    # It's parent folder however must already exist!
+    # However it's parent folder however must already exist!
     "test_output" : "./test_output",
 
     # --------------------------------
-    "contexts" :
+    "context_details" :
     {
         # ----------------------------
         "python2.x" :
-        [
-            "c:/python27/python.exe"
-        ],
+        {
+            "executable" : "c:/python27/python.exe"
+        }
+        ,
         # ----------------------------
         "python3.x" :
-        [
-            "c:/python37/python.exe"
-        ],
+        {
+            "executable" : "c:/python37/python.exe"
+        }
+        ,
         # ----------------------------
         "python" :
-        [
-            "c:/python37/python.exe",
-            "c:/python27/python.exe"
-        ]
+        {
+            "nested_contexts" :
+            [
+                "python3.x",
+                "python2.x"
+            ]
+        }
     }
 
 }

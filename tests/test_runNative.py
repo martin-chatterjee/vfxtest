@@ -10,7 +10,7 @@ import vfxtest
 
 
 # -----------------------------------------------------------------------------
-class RunTestsTestCase(unittest.TestCase):
+class RunNativeTestCase(unittest.TestCase):
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -36,14 +36,14 @@ class RunTestsTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test01_runTests_runs_successfully(self):
+    def test01_runNative_runs_successfully(self):
 
         cov_file = os.path.abspath('./test_output/.coverage.native')
         if os.path.exists(cov_file):
             os.remove(cov_file)
 
-        settings = vfxtest.collectSettings()
-        vfxtest.runTests(target='.', settings=settings, context='native', use_coverage=True)
+        settings = vfxtest.collectSettings(['--target', '.'])
+        vfxtest.runNative(settings=settings, use_coverage=True)
 
         self.assertEqual(settings['count_run'], 6)
         self.assertEqual(settings['count_failures'], 0)
@@ -51,10 +51,10 @@ class RunTestsTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(cov_file))
 
     # -------------------------------------------------------------------------
-    def test02_runTests_with_filter_tokens_runs_successfully(self):
+    def test02_runNative_with_filter_tokens_runs_successfully(self):
 
-        settings = vfxtest.collectSettings(['_01',])
-        vfxtest.runTests(target='.', settings=settings, context='native', use_coverage=False)
+        settings = vfxtest.collectSettings(['--target', '.', '_01',])
+        vfxtest.runNative(settings=settings, use_coverage=False)
         self.assertEqual(settings['count_run'], 3)
         self.assertEqual(settings['count_failures'], 0)
         self.assertEqual(settings['count_errors'], 0)
@@ -63,7 +63,8 @@ class RunTestsTestCase(unittest.TestCase):
     def test03_combineCoverages_works_as_expected(self):
 
         settings = vfxtest.collectSettings(['_02',])
-        vfxtest.runTests(target='.', settings=settings, context='differentContext')
+        settings['context'] = 'differentContext'
+        vfxtest.runNative(settings=settings)
         self.assertEqual(settings['count_run'], 3)
         self.assertTrue(os.path.exists('{}/.coverage.differentContext'.format(settings['test_output'])))
 
@@ -76,18 +77,16 @@ class RunTestsTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test04_resolveContext_defaults_to_native(self):
         settings = vfxtest.collectSettings()
-        context = vfxtest.resolveContext(settings)
-        self.assertEqual(context, 'native')
+        self.assertEqual(settings['context'], 'native')
 
     # -------------------------------------------------------------------------
     def test05_resolveContext_defaults_to_native(self):
         settings = vfxtest.collectSettings(['--target','./python2.x'])
-        context = vfxtest.resolveContext(settings)
-        self.assertEqual(context, 'python2.x')
+        self.assertEqual(settings['context'], 'python2.x')
 
-    # -------------------------------------------------------------------------
-    def test06_runChildContextTests(self):
-        settings = vfxtest.collectSettings()
-        vfxtest.runChildContextTests(target=settings['cwd'], settings=settings)
-        # context = vfxtest.resolveContext(settings)
-        # self.assertEqual(context, 'python2.x')
+    # # -------------------------------------------------------------------------
+    # def test06_runChildContextTests(self):
+    #     settings = vfxtest.collectSettings()
+    #     vfxtest.runChildContextTests(target=settings['cwd'], settings=settings)
+    #     # context = vfxtest.resolveContext(settings)
+    #     # self.assertEqual(context, 'python2.x')
