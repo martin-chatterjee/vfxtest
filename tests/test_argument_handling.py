@@ -28,7 +28,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         """
         """
         self.cwd = os.getcwd()
-        os.chdir('./test_setting')
+        os.chdir('./test_sandbox')
     # -------------------------------------------------------------------------
     def tearDown(self):
         """
@@ -143,7 +143,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         os.chdir('..')
 
     # -------------------------------------------------------------------------
-    def test10_collectSettings_json_settings_get_recovered(self):
+    def test10_collectSettings_settings_in_environment_get_recovered(self):
 
         result_a = vfxtest.collectSettings(['--target', './subfolder',
                                             '--failfast', 'False',
@@ -161,11 +161,15 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertEqual(result_a['limit'], 13)
         self.assertEqual(result_a['filter_tokens'], ['foo', 'bar', 'baz'])
 
-        serialized = json.dumps(result_a)
-        result_b = vfxtest.collectSettings(['--settings', serialized])
+        self.assertEqual(result_a['subprocess'], False)
 
-        print('<>>>>>>>>> {}'.format(result_b['subprocess']))
+        serialized = json.dumps(result_a)
+        os.environ['vfxtest_settings'] = serialized
+        result_b = vfxtest.collectSettings()
+        os.environ.pop('vfxtest_settings')
+
+        self.assertEqual(result_b['subprocess'], True)
 
         result_a['subprocess'] = None
         result_b['subprocess'] = None
-        # self.assertEqual(result_a, result_b)
+        self.assertEqual(result_a, result_b)

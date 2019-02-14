@@ -7,7 +7,7 @@
     # temp storage folder for this test suite.
     # If it does not exist it will get created.
     # However it's parent folder however must already exist!
-    "test_output" : "./test_output",
+    "test_output" : "../test_output",
 
     # --------------------------------
     "context_details" :
@@ -32,7 +32,13 @@
                 "python3.x",
                 "python2.x"
             ]
+        },
+        # ----------------------------
+        "context_without_wrapper_script" :
+        {
+            "executable" : "c:/python27/python.exe"
         }
+
     }
 
 }

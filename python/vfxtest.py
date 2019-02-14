@@ -72,53 +72,133 @@ EXAMPLE USAGES
 
 
 # -----------------------------------------------------------------------------
-def main(args):
+def main(args=[]):
     """
     """
     # collect and validate settings from arguments and preferences
     settings = collectSettings(args)
+
+    print('===== LIMIT {}'.format(settings['limit']))
+    print('===== COUNT {}'.format(settings['count_files_run']))
+
     # run test suite in current folder
-    runTestSuite(settings=settings)
+    runTestSuite(settings)
+    print('===== LIMIT {}'.format(settings['limit']))
+    print('===== COUNT {}'.format(settings['count_files_run']))
 
     if settings['subprocess'] is False:
         # run all child context test suites
-        runChildTestSuites(settings=settings)
+        runChildTestSuites(settings)
         # combine coverages
-        combineCoverages(settings=settings)
+        combineCoverages(settings)
+
+    exit_status = _encodeStatsIntoReturnCode(settings)
+    return exit_status
+
+# -----------------------------------------------------------------------------
+def _encodeStatsIntoReturnCode(settings):
+    """
+    """
+    # cap all count stats into range 0 - 999
+    for item in ['count_files_run', 'count_tests_run', 'count_errors']:
+        if settings[item] > 999:
+            print("Warning: '{}' run was {} - capping to 999".format(item, settings[item]))
+            settings[item] = 999
+        elif settings[item] < 0:
+            print("Warning: '{}' run was {} - capping to 0".format(item, settings[item]))
+            settings[item] = 0
+
+    result = 0
+    result += (settings['count_files_run'] * 1000000)
+    result += (settings['count_tests_run'] * 1000)
+    result += (settings['count_errors'] * 1)
+
+    return result
 
 # -----------------------------------------------------------------------------
 def runTestSuite(settings):
-
-    if settings['context'] == 'native':
+    """
+    """
+    if settings['context'] == 'native' or settings['subprocess'] == True:
         runNative(settings)
         return
 
     for context in _resolveContextsToRun(settings):
 
-        ctxt_settings = copy.deepcopy(settings)
-        ctxt_settings['context'] = context
-        wrapper = _getWrapperPath(ctxt_settings)
-        executable = _getExecutable(ctxt_settings)
-        json_settings = json.dumps(ctxt_settings)
-        json_settings = json_settings.replace('"', '\\"')
-        json_settings = '"{}"'.format(json_settings)
+        try:
+            # start with copy of settings, update context
+            ctxt_settings = copy.deepcopy(settings)
+            ctxt_settings['context'] = context
 
-        args = [wrapper,
-                executable,
-                __file__,
-                json_settings]
+            _storeSettingsInEnv(ctxt_settings)
+            wrapper = _getWrapperPath(ctxt_settings)
+            executable = _getExecutable(ctxt_settings)
 
-        print(' '.join(args))
-        proc = subprocess.Popen(args=args,
-                                bufsize=0,
-                                shell=True,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT)
-        while True:
-            line = proc.stdout.readline().decode('utf-8').rstrip()
-            if not line:
-                break
-            print(line)
+            args = [wrapper,
+                    executable,
+                    __file__]
+
+            print('')
+            print('Wrapper call:')
+            print('-------------')
+            print('        ' + ' '.join(args))
+            print('')
+
+            proc = subprocess.Popen(args=args,
+                                    bufsize=0,
+                                    shell=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
+
+            print ('/'*80)
+            while True:
+                line = proc.stdout.readline().decode('utf-8')
+                if not line:
+                    break
+                sys.stdout.write(line)
+            print ('/'*80)
+
+            proc.wait()
+            print('')
+            print('Process Return Code: {}'.format(proc.returncode))
+            print('')
+
+            _recoverStatsFromReturnCode(settings, proc.returncode)
+
+        except Exception as e:
+            raise(e)
+        finally:
+            _clearSettingsInEnv()
+
+
+# -----------------------------------------------------------------------------
+def _recoverStatsFromReturnCode(settings, returncode):
+    """
+    """
+    count_files_run = returncode // 1000000
+    returncode -= (count_files_run * 1000000)
+    count_tests_run = returncode // 1000
+    returncode -= (count_tests_run * 1000)
+    count_errors = returncode
+
+    settings['count_files_run'] = count_files_run
+    settings['count_tests_run'] = count_tests_run
+    settings['count_errors'] = count_errors
+
+# -----------------------------------------------------------------------------
+def _storeSettingsInEnv(settings):
+    """
+    """
+    # serialize and store in environment variable
+    json_settings = json.dumps(settings)
+    os.environ['vfxtest_settings'] = json_settings
+
+# -----------------------------------------------------------------------------
+def _clearSettingsInEnv():
+    """
+    """
+    if 'vfxtest_settings' in os.environ:
+        os.environ.pop('vfxtest_settings')
 
 # -----------------------------------------------------------------------------
 def _resolveContextsToRun(settings):
@@ -162,9 +242,20 @@ def _getWrapperPath(settings):
 def runChildTestSuites(settings):
     """
     """
-    # TODO
+    child_settings = settings.copy()
 
+    target = child_settings['target']
+    for item in os.listdir(target):
+        if item in child_settings['context_details']:
+            item_path = '{}{}{}'.format(target, os.sep, item)
+            if os.path.isdir(item_path):
+                child_settings['target'] = item_path
+                child_settings['context'] = item
+                runTestSuite(child_settings)
 
+    settings['count_files_run'] = child_settings['count_files_run']
+    settings['count_tests_run'] = child_settings['count_tests_run']
+    settings['count_errors'] = child_settings['count_errors']
 
 # -----------------------------------------------------------------------------
 def runNative(settings, use_coverage=True):
@@ -178,16 +269,25 @@ def runNative(settings, use_coverage=True):
     runner = unittest.TextTestRunner(failfast=settings['failfast'],
                                      buffer=False)
     # run tests file by file
+    print('SAFETY:   {}'.format(settings['count_files_run']))
+    print('LIMIT:    {}'.format(settings['limit']))
     for item in suite:
+        if (settings['limit'] > 0 and
+                settings['count_files_run'] >= settings['limit']):
+            print('Reached file limit... Stopping here...')
+            break
+
         print('-'*70)
+        # TODO
+        # print name of file
         result = runner.run(item)
-        settings['count_run'] += result.testsRun
-        settings['count_errors'] += len(result.errors)
-        settings['count_failures'] += len(result.failures)
+        settings['count_files_run'] += 1
+        settings['count_tests_run'] += result.testsRun
+        settings['count_errors'] += len(result.errors) + len(result.failures)
 
     if use_coverage:
         # --> can't be covered:
-        #     coverage is now running inside of another coverage run
+        #     coverage does not work inside of another coverage run
         _stopCoverage(settings, cov) # pragma: no cover
 
 # -----------------------------------------------------------------------------
@@ -196,10 +296,8 @@ def collectSettings(args=[]):
     """
     # define arguments
     arg_parser = _defineArguments()
-    # receive valid arguments as dictionary
-    settings = vars(arg_parser.parse_args(args))
     # validate preferences and add to settings
-    _addValidatedPrefsToSettings(settings)
+    settings = _getSettings(arg_parser, args)
 
     return settings
 
@@ -211,7 +309,7 @@ def resolveContext(settings):
     context = os.path.basename(settings['target'])
     if not context in settings['context_details']:
         context = 'native'
-    settings['context'] = context
+    return context
 
 # -----------------------------------------------------------------------------
 def combineCoverages(settings):
@@ -222,29 +320,11 @@ def combineCoverages(settings):
     cov = coverage.Coverage(data_file=data_file)
     cov.combine()
     cov.save()
-    cov.report()
-    cov.html_report(directory='{}/_coverage_html'.format(test_output))
-
-# # -----------------------------------------------------------------------------
-# def runChildContextTests(target, settings):
-#     """
-#     """
-#     for item in os.listdir(target):
-#         if item in settings['context_details']:
-#             item_path = '{}{}{}'.format(target, os.sep, item)
-#             if os.path.isdir(item_path):
-#                 executables = settings['context_details'][item]
-#                 for executable in executables:
-#                     commandline = [executable,]
-#                     commandline.append(__file__)
-#                     commandline.append('--target')
-#                     commandline.append(item_path)
-#                     commandline.append('--prefs')
-#                     commandline.append(settings['prefs'])
-#                     commandline.append('--test')
-#                     commandline.append(settings['prefs'])
-#                     print(' '.join(commandline))
-
+    try:
+        cov.report()
+        cov.html_report(directory='{}/_coverage_html'.format(test_output))
+    except coverage.misc.CoverageException as e:
+        print('Coverage: no data to report')
 
 # -----------------------------------------------------------------------------
 def _defineArguments():
@@ -264,8 +344,6 @@ def _defineArguments():
                              "    - the one root dir of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
                         help='limits the number of test files that get executed.')
-    parser.add_argument('-s', '--settings', metavar='<json>', type=str, default=None,
-                        help=argparse.SUPPRESS)
     parser.add_argument('filter_tokens', nargs='*', type=str,
                         help='specify tokens that filter down the test files by name.')
 
@@ -279,7 +357,12 @@ def _startCoverage(settings):
     omit.append('*vfxtest.py')
     # omit all test files
     if not settings['include_test_files']:
-        omit.append(settings['test_file_pattern'])
+        # prepare test file pattern
+        prefix = settings['target'].replace(settings['cwd'], '')
+        if len(prefix) > 0:
+            prefix = '{}{}'.format(prefix[1:], prefix[0])
+        test_file_pattern = prefix + settings['test_file_pattern']
+        omit.append(test_file_pattern)
 
     data_file='{}/.coverage'.format(settings['test_output'])
     cov = coverage.Coverage(omit=omit,
@@ -287,7 +370,7 @@ def _startCoverage(settings):
                             data_suffix=settings['context'])
     cov.start()
     # --> can't be covered:
-    #     coverage is now running inside of another coverage run
+    #     coverage does not work inside of another coverage run
     return cov # pragma: no cover
 
 # -----------------------------------------------------------------------------
@@ -308,29 +391,31 @@ def _stopCoverage(settings, cov, report=True):
     """
     """
     # --> can't be covered:
-    #     coverage is now running inside of another coverage run
+    #     coverage does not work inside of another coverage run
     cov.stop() # pragma: no cover
 
     cov.save()
     if report:
-        cov.report()
+        try:
+            cov.report()
+        except coverage.misc.CoverageException as e:
+            print('Coverage: no data to report')
 
 # -----------------------------------------------------------------------------
-def _addValidatedPrefsToSettings(settings):
+def _getSettings(arg_parser, args):
     """
     """
+    settings = {}
+
     try:
-        # recover passed in settings if they are present
-        if settings['settings'] is not None:
-            _recoverSettings(settings)
+        # start with arguments
+        settings = vars(arg_parser.parse_args(args=args))
+
+        # use settings in environment if present, fall back to prefs file
+        if 'vfxtest_settings' in os.environ:
+            _recoverSettingsFromEnv(settings)
         else:
             _readPrefs(settings)
-
-        # some inits
-        resolveContext(settings)
-        settings['count_run'] = 0
-        settings['count_errors'] = 0
-        settings['count_failures'] = 0
 
         # make all paths absolute
         for key in ['prefs', 'target', 'test_output']:
@@ -346,15 +431,17 @@ def _addValidatedPrefsToSettings(settings):
             os.makedirs(test_output)
 
     except Exception as e:
-        print('Failed to read and conform preferences:'
-              '\n{}\n{}'.format(e, traceback.format_exc()))
+        print('Failed to read and conform preferences:\n{}\n{}'.format(e, traceback.format_exc()))
         raise(SystemExit)
 
+    return settings
+
 # -----------------------------------------------------------------------------
-def _recoverSettings(settings):
+def _recoverSettingsFromEnv(settings):
     """
     """
-    recovered_settings = json.loads(settings['settings'])
+    serialized = os.environ['vfxtest_settings']
+    recovered_settings = json.loads(serialized)
     settings.clear()
     settings.update(recovered_settings)
 
@@ -393,7 +480,15 @@ def _readPrefs(settings):
         wrapper_scripts = '{}{}wrapper_scripts'.format(os.path.dirname(__file__), os.sep)
         settings['wrapper_scripts'] = wrapper_scripts
 
+    if not 'count_files_run' in settings:
+        settings['count_files_run'] = 0
+    if not 'count_tests_run' in settings:
+        settings['count_tests_run'] = 0
+    if not 'count_errors' in settings:
+        settings['count_errors'] = 0
+
     settings['cwd'] = os.getcwd()
+    settings['context'] = resolveContext(settings)
 
     settings['subprocess'] = False
 
@@ -441,5 +536,5 @@ class FilteredTestLoader(unittest.TestLoader):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    main(sys.argv[1:]) # pragma: no cover
+    sys.exit(main(sys.argv[1:])) # pragma: no cover
 

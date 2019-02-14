@@ -6,22 +6,22 @@
 import unittest
 import os
 
-import module_to_test
+import awesome_module
 
 # -----------------------------------------------------------------------------
-class TestCase01(unittest.TestCase):
+class FooTest(unittest.TestCase):
 
     # -------------------------------------------------------------------------
     def test01_(self):
-        foo = module_to_test.fizz(3, 5)
+        foo = awesome_module.lorem(3, 5)
         self.assertEqual(foo, 8)
 
     # -------------------------------------------------------------------------
     def test02_(self):
-        foo = module_to_test.buzz(3, 5)
-        self.assertEqual(foo, 8)
+        foo = awesome_module.lorem(6, 4)
+        self.assertEqual(foo, 10)
 
     # -------------------------------------------------------------------------
     def test03_(self):
-        foo = module_to_test.foo(3, 5)
-        self.assertEqual(foo, 8)
+        foo = awesome_module.lorem(1, 2)
+        self.assertEqual(foo, 3)
