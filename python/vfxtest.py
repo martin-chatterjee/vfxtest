@@ -19,7 +19,8 @@ import coverage
 NEXT STEPS
 ----------
 
-- serialize full settings dict and pass it in as a command line argument
+*** - serialize full settings dict and pass it in as a command line argument
+
 - append executable index to coverage suffix --> .coverage.python.0
 - full test case with two separate child contexts
 
@@ -195,6 +196,8 @@ def collectSettings(args=[]):
                              "    - the one root dir of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
                         help='limits the number of test files that get executed.')
+    parser.add_argument('-s', '--settings', metavar='<json>', type=str, default=None,
+                        help=argparse.SUPPRESS)
     parser.add_argument('filter_tokens', nargs='*', type=str,
                         help='specify tokens that filter down the test files by name.')
 
@@ -211,36 +214,20 @@ def _addValidatedPrefsToSettings(settings):
     """
     """
     try:
-        # initialize a few settings
-        settings['include_test_files'] = False
-        settings['test_file_pattern'] = 'test*.py'
+        # recover passed in settings if they are present
+        if settings['settings'] is not None:
+            recovered_settings = json.loads(settings['settings'])
+            settings.clear()
+            settings.update(recovered_settings)
+        # otherwise use prefs file
+        else:
+            _readPrefs(settings)
+
+        # some inits
         settings['count_run'] = 0
         settings['count_errors'] = 0
         settings['count_failures'] = 0
         settings['cwd'] = os.getcwd()
-
-        # prefer 'test.prefs' in current folder, fallback to parent folder
-        if settings['prefs'] is None:
-            if os.path.exists('./test.prefs'):
-                settings['prefs'] = './test.prefs'
-            else:
-                settings['prefs'] = '../test.prefs'
-
-        # read out prefs and strip comments
-        with open(settings['prefs'], 'r') as f:
-            lines = []
-            for line in f.readlines():
-                tokens = line.split('#')
-                lines.append(tokens[0])
-        # interpret as json and add to settings
-        prefs = json.loads('\n'.join(lines))
-        settings.update(prefs)
-
-        # validate test_output
-        if not 'test_output' in settings:
-            settings['test_output'] = './test_output'
-        if not 'contexts' in settings:
-            settings['contexts'] = {}
 
         # make all paths absolute
         for key in ['prefs', 'target', 'test_output']:
@@ -260,6 +247,36 @@ def _addValidatedPrefsToSettings(settings):
                '\n\n{}'
                '\n\n{}'.format(e, traceback.format_exc()))
         raise(SystemExit)
+
+# -----------------------------------------------------------------------------
+def _readPrefs(settings):
+    """
+    """
+    # prefer 'test.prefs' in current folder, fallback to parent folder
+    if settings['prefs'] is None:
+        if os.path.exists('./test.prefs'):
+            settings['prefs'] = './test.prefs'
+        else:
+            settings['prefs'] = '../test.prefs'
+
+    # read out prefs and strip comments
+    with open(settings['prefs'], 'r') as f:
+        lines = []
+        for line in f.readlines():
+            tokens = line.split('#')
+            lines.append(tokens[0])
+    # interpret as json and add to settings
+    prefs = json.loads('\n'.join(lines))
+    settings.update(prefs)
+    # initialize a few settings
+    if not 'include_test_files' in settings:
+        settings['include_test_files'] = False
+    if not 'test_file_pattern' in settings:
+        settings['test_file_pattern'] = 'test*.py'
+    if not 'test_output' in settings:
+        settings['test_output'] = './test_output'
+    if not 'contexts' in settings:
+        settings['contexts'] = {}
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):

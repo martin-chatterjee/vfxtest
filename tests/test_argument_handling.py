@@ -5,6 +5,7 @@
 
 import unittest
 import os
+import json
 
 import vfxtest
 
@@ -131,7 +132,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         os.rmdir('./remove_me')
 
     # -------------------------------------------------------------------------
-    def test00008_collectSettings_falls_back_to_prefs_in_parent_folder(self):
+    def test09_collectSettings_falls_back_to_prefs_in_parent_folder(self):
 
         cwd = os.getcwd()
         os.chdir('./python2.x')
@@ -140,3 +141,27 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                                           os.sep,
                                                           'test.prefs'))
         os.chdir('..')
+
+    # -------------------------------------------------------------------------
+    def test10_collectSettings_json_settings_get_recovered(self):
+
+        result_a = vfxtest.collectSettings(['--target', './subfolder',
+                                            '--failfast', 'False',
+                                            '--prefs', './other.prefs',
+                                            '--limit', '13',
+                                            'foo', 'bar', 'baz'])
+
+        self.assertEqual(result_a['target'], '{}{}{}'.format(os.getcwd(),
+                                                           os.sep,
+                                                           'subfolder'))
+        self.assertEqual(result_a['failfast'], False)
+        self.assertEqual(result_a['prefs'], '{}{}{}'.format(os.getcwd(),
+                                                          os.sep,
+                                                          'other.prefs'))
+        self.assertEqual(result_a['limit'], 13)
+        self.assertEqual(result_a['filter_tokens'], ['foo', 'bar', 'baz'])
+
+        serialized = json.dumps(result_a)
+        result_b = vfxtest.collectSettings(['--settings', serialized])
+
+        self.assertEqual(result_a, result_b)
