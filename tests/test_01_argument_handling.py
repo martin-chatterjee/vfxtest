@@ -173,3 +173,8 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         result_a['subprocess'] = None
         result_b['subprocess'] = None
         self.assertEqual(result_a, result_b)
+
+
+# -----------------------------------------------------------------------------
+if __name__ == '__main__':
+    unittest.main()

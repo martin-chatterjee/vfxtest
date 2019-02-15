@@ -81,3 +81,6 @@ class RunMainTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
 
+# -----------------------------------------------------------------------------
+if __name__ == '__main__':
+    unittest.main()

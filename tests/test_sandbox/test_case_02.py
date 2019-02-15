@@ -3,13 +3,13 @@
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
-import unittest
+import vfxtest
 import os
 
 import awesome_module
 
 # -----------------------------------------------------------------------------
-class FooTest(unittest.TestCase):
+class TestCase02(vfxtest.TestCase):
 
     # -------------------------------------------------------------------------
     def test01_(self):

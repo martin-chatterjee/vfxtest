@@ -45,8 +45,6 @@ class RunNativeTestCase(unittest.TestCase):
         cov_file = os.path.abspath('{}/.coverage.native'.format(settings['test_output']))
         if os.path.exists(cov_file):
             os.remove(cov_file)
-        print('WRD  {}'.format(cov_file))
-        print('xxx {}'.format(settings['context']))
         vfxtest.runNative(settings=settings, use_coverage=True)
 
         self.assertEqual(settings['count_files_run'], 2)
@@ -110,3 +108,8 @@ class RunNativeTestCase(unittest.TestCase):
         self.assertEqual(settings['count_files_run'], 1)
         self.assertEqual(settings['count_tests_run'], 3)
         self.assertEqual(settings['count_errors'], 0)
+
+
+# -----------------------------------------------------------------------------
+if __name__ == '__main__':
+    unittest.main()

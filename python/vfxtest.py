@@ -4,41 +4,53 @@
 # -----------------------------------------------------------------------------
 
 import argparse
+import copy
+from fnmatch import fnmatch
+import glob
 import json
 import os
-import copy
 import platform
-import glob
 import subprocess
 import sys
 import traceback
 import unittest
-from fnmatch import fnmatch
+
+try:
+    import colorama
+    colorama.init()
+except:
+    pass
 
 import coverage
 
 """
-
 NEXT STEPS
 ----------
 
+*** - retrieve current test file name for logging
+*** - make settings available inside test case methods
+- review and port mock parts
+- add debug output mode
 - build and test all our wrapper scripts:
     mayapy
     maya
     hython
     houdini
+- build the vfxtest.cmd/.sh wrappers
+- read up on pip
+- documentation
 
 
-- move --settings into environment variable
-- make sure encode/decode plays nice
-- refactor main() once more
+
+*** - move --settings into environment variable
+***- make sure encode/decode plays nice
+***- refactor main() once more
 
 
 *** - serialize full settings dict and pass it in as a command line argument
 
-- append executable index to coverage suffix --> .coverage.python.0
-- full test case with two separate child context_details
-
+*** [- append executable index to coverage suffix --> .coverage.python.0]
+*** - full test case with two separate child context_details
 
 
 USAGE
@@ -97,6 +109,193 @@ def main(args=[]):
     exit_status = _encodeStatsIntoReturnCode(settings)
     return exit_status
 
+
+# -----------------------------------------------------------------------------
+def runTestSuite(settings, report=True):
+    """
+    """
+    if settings['context'] == 'native' or settings['subprocess'] == True:
+        runNative(settings, report=report)
+        return
+
+    for context in _resolveContextsToRun(settings):
+
+        try:
+            # start with copy of settings, update context
+            ctxt_settings = copy.deepcopy(settings)
+            ctxt_settings['context'] = context
+
+            _storeSettingsInEnv(ctxt_settings)
+            wrapper = _getWrapperPath(ctxt_settings)
+            executable = _getExecutable(ctxt_settings)
+            path_to_myself = _getPathToMyself()
+
+            args = [wrapper,
+                    executable,
+                    path_to_myself,
+                    str(settings['debug_mode'])]
+
+            print('')
+            print('/'*80)
+            status_line = "// Running tests in subprocess for context '{}': ".format(context)
+            status_line += '/'*(80-len(status_line))
+            print (status_line)
+            print('')
+
+            if settings['debug_mode']:
+                print('')
+                print('[DBG] Wrapper call:')
+                print('      -------------')
+                print('              ' + ' '.join(args))
+                print('[DBG] target folder:')
+                print('      -------------')
+                print('              ' + ctxt_settings['target'])
+                print('[DBG] target context:')
+                print('      -------------')
+                print('              ' + ctxt_settings['context'])
+                print('')
+
+
+            proc = subprocess.Popen(args=args,
+                                    bufsize=0,
+                                    shell=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
+
+            sys.stdout.flush()
+            while True:
+                line = proc.stdout.readline().decode('utf-8')
+                if not line:
+                    break
+                sys.stdout.write(line)
+            proc.wait()
+
+            if settings['debug_mode']:
+                print('')
+                print('[DBG] --> Process Return Code: {}'.format(proc.returncode))
+                print('')
+
+            print('')
+            print ('/'*80)
+            print('')
+            sys.stdout.flush()
+
+            _recoverStatsFromReturnCode(settings, proc.returncode)
+
+        except Exception as e:
+            raise(e)
+        finally:
+            _clearSettingsInEnv()
+
+
+# -----------------------------------------------------------------------------
+def runChildTestSuites(settings):
+    """
+    """
+    child_settings = settings.copy()
+
+    target = child_settings['target']
+    for item in os.listdir(target):
+        if item in child_settings['context_details']:
+            item_path = '{}{}{}'.format(target, os.sep, item)
+            if os.path.isdir(item_path):
+                child_settings['target'] = item_path
+                child_settings['context'] = item
+                runTestSuite(child_settings)
+
+    settings['count_files_run'] = child_settings['count_files_run']
+    settings['count_tests_run'] = child_settings['count_tests_run']
+    settings['count_errors'] = child_settings['count_errors']
+
+# -----------------------------------------------------------------------------
+def runNative(settings, report=True, use_coverage=True):
+    """
+    """
+    if use_coverage:
+        cov = _startCoverage(settings)
+
+    suite = _discoverTests(settings)
+
+    runner = TextTestRunner(failfast=settings['failfast'],
+                            buffer=False)
+    # run tests file by file
+    for item in suite:
+        if (settings['limit'] > 0 and
+                settings['count_files_run'] >= settings['limit']):
+            print('Reached file limit... Stopping here...')
+            break
+
+        result = runner.run(item, settings=settings)
+
+        settings['count_files_run'] += 1
+        settings['count_tests_run'] += result.testsRun
+        settings['count_errors'] += len(result.errors) + len(result.failures)
+
+    if use_coverage:
+        # --> can't be covered:
+        #     coverage does not work inside of another coverage run
+        _stopCoverage(settings, cov, report=report) # pragma: no cover
+
+# -----------------------------------------------------------------------------
+def collectSettings(args=[]):
+    """
+    """
+    # define arguments
+    arg_parser = _defineArguments()
+    # validate preferences and add to settings
+    settings = _getSettings(arg_parser, args)
+
+    return settings
+
+
+# -----------------------------------------------------------------------------
+def resolveContext(settings):
+    """
+    """
+    context = os.path.basename(settings['target'])
+    if not context in settings['context_details']:
+        context = 'native'
+    return context
+
+# -----------------------------------------------------------------------------
+def combineCoverages(settings):
+    """
+    """
+    test_output = settings['test_output']
+    data_file='{}/.coverage'.format(test_output)
+    cov = coverage.Coverage(data_file=data_file)
+    cov.combine()
+    cov.save()
+    try:
+        print('')
+        cov.report()
+        cov.html_report(directory='{}/_coverage_html'.format(test_output))
+    except coverage.misc.CoverageException as e:
+        print('Coverage: no data to report')
+
+# -----------------------------------------------------------------------------
+def _defineArguments():
+    """
+    """
+    parser = argparse.ArgumentParser(description='Run test suite(s):')
+
+    parser.add_argument('-t', '--target', metavar='', type=str, default='.',
+                        help='target folder path (defaults to current working directory)')
+    parser.add_argument('-f', '--failfast', type=__stringToBool, default=True,
+                        help='Stops execution of test suite on first error.')
+    parser.add_argument('-p', '--prefs', metavar='', type=str, default=None,
+                        help="path of the .prefs file to use. "
+                             ""
+                             "Defaults to 'test.prefs' in:"
+                             "    - the current working directory"
+                             "    - the one root dir of the current working directory")
+    parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
+                        help='limits the number of test files that get executed.')
+    parser.add_argument('filter_tokens', nargs='*', type=str,
+                        help='specify tokens that filter down the test files by name.')
+
+    return parser
+
 # -----------------------------------------------------------------------------
 def _encodeStatsIntoReturnCode(settings):
     """
@@ -116,70 +315,6 @@ def _encodeStatsIntoReturnCode(settings):
     result += (settings['count_errors'] * 1)
 
     return result
-
-# -----------------------------------------------------------------------------
-def runTestSuite(settings):
-    """
-    """
-    if settings['context'] == 'native' or settings['subprocess'] == True:
-        runNative(settings)
-        return
-
-    for context in _resolveContextsToRun(settings):
-
-        try:
-            # start with copy of settings, update context
-            ctxt_settings = copy.deepcopy(settings)
-            ctxt_settings['context'] = context
-
-            _storeSettingsInEnv(ctxt_settings)
-            wrapper = _getWrapperPath(ctxt_settings)
-            executable = _getExecutable(ctxt_settings)
-            path_to_myself = _getPathToMyself()
-
-            args = [wrapper,
-                    executable,
-                    path_to_myself]
-
-            print('')
-            print('Wrapper call:')
-            print('-------------')
-            print('        ' + ' '.join(args))
-            print('target folder:')
-            print('-------------')
-            print('        ' + ctxt_settings['target'])
-            print('target context:')
-            print('-------------')
-            print('        ' + ctxt_settings['context'])
-            print('')
-
-
-            proc = subprocess.Popen(args=args,
-                                    bufsize=0,
-                                    shell=True,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT)
-
-            print ('/'*80)
-            while True:
-                line = proc.stdout.readline().decode('utf-8')
-                if not line:
-                    break
-                sys.stdout.write(line)
-            print ('/'*80)
-
-            proc.wait()
-            print('')
-            print('Process Return Code: {}'.format(proc.returncode))
-            print('')
-
-            _recoverStatsFromReturnCode(settings, proc.returncode)
-
-        except Exception as e:
-            raise(e)
-        finally:
-            _clearSettingsInEnv()
-
 
 # -----------------------------------------------------------------------------
 def _recoverStatsFromReturnCode(settings, returncode):
@@ -261,115 +396,6 @@ def _getWrapperPath(settings):
     return wrapper_path
 
 # -----------------------------------------------------------------------------
-def runChildTestSuites(settings):
-    """
-    """
-    child_settings = settings.copy()
-
-    target = child_settings['target']
-    for item in os.listdir(target):
-        if item in child_settings['context_details']:
-            item_path = '{}{}{}'.format(target, os.sep, item)
-            if os.path.isdir(item_path):
-                child_settings['target'] = item_path
-                child_settings['context'] = item
-                runTestSuite(child_settings)
-
-    settings['count_files_run'] = child_settings['count_files_run']
-    settings['count_tests_run'] = child_settings['count_tests_run']
-    settings['count_errors'] = child_settings['count_errors']
-
-# -----------------------------------------------------------------------------
-def runNative(settings, use_coverage=True):
-    """
-    """
-    if use_coverage:
-        cov = _startCoverage(settings)
-
-    suite = _discoverTests(settings)
-
-    runner = unittest.TextTestRunner(failfast=settings['failfast'],
-                                     buffer=False)
-    # run tests file by file
-    for item in suite:
-        if (settings['limit'] > 0 and
-                settings['count_files_run'] >= settings['limit']):
-            print('Reached file limit... Stopping here...')
-            break
-
-        print('-'*70)
-        # TODO
-        # print name of file
-        result = runner.run(item)
-        settings['count_files_run'] += 1
-        settings['count_tests_run'] += result.testsRun
-        settings['count_errors'] += len(result.errors) + len(result.failures)
-
-    if use_coverage:
-        # --> can't be covered:
-        #     coverage does not work inside of another coverage run
-        _stopCoverage(settings, cov) # pragma: no cover
-
-# -----------------------------------------------------------------------------
-def collectSettings(args=[]):
-    """
-    """
-    # define arguments
-    arg_parser = _defineArguments()
-    # validate preferences and add to settings
-    settings = _getSettings(arg_parser, args)
-
-    return settings
-
-
-# -----------------------------------------------------------------------------
-def resolveContext(settings):
-    """
-    """
-    context = os.path.basename(settings['target'])
-    if not context in settings['context_details']:
-        context = 'native'
-    return context
-
-# -----------------------------------------------------------------------------
-def combineCoverages(settings):
-    """
-    """
-    test_output = settings['test_output']
-    data_file='{}/.coverage'.format(test_output)
-    cov = coverage.Coverage(data_file=data_file)
-    cov.combine()
-    cov.save()
-    try:
-        cov.report()
-        cov.html_report(directory='{}/_coverage_html'.format(test_output))
-    except coverage.misc.CoverageException as e:
-        print('Coverage: no data to report')
-
-# -----------------------------------------------------------------------------
-def _defineArguments():
-    """
-    """
-    parser = argparse.ArgumentParser(description='Run test suite(s):')
-
-    parser.add_argument('-t', '--target', metavar='', type=str, default='.',
-                        help='target folder path (defaults to current working directory)')
-    parser.add_argument('-f', '--failfast', type=__stringToBool, default=True,
-                        help='Stops execution of test suite on first error.')
-    parser.add_argument('-p', '--prefs', metavar='', type=str, default=None,
-                        help="path of the .prefs file to use. "
-                             ""
-                             "Defaults to 'test.prefs' in:"
-                             "    - the current working directory"
-                             "    - the one root dir of the current working directory")
-    parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
-                        help='limits the number of test files that get executed.')
-    parser.add_argument('filter_tokens', nargs='*', type=str,
-                        help='specify tokens that filter down the test files by name.')
-
-    return parser
-
-# -----------------------------------------------------------------------------
 def _startCoverage(settings):
 
     omit = []
@@ -417,6 +443,7 @@ def _stopCoverage(settings, cov, report=True):
     cov.save()
     if report:
         try:
+            print('')
             cov.report()
         except coverage.misc.CoverageException as e:
             print('Coverage: no data to report')
@@ -451,6 +478,10 @@ def _getSettings(arg_parser, args):
             os.makedirs(test_output)
 
     except Exception as e:
+        # if not isinstance(e, json.decoder.JSONDecodeError):
+        print(e.__class__)
+        print(isinstance(e, ValueError))
+        # if not isinstance(e, ValueError):
         print('Failed to read and conform preferences:\n{}\n{}'.format(e, traceback.format_exc()))
         raise(SystemExit)
 
@@ -477,15 +508,26 @@ def _readPrefs(settings):
             settings['prefs'] = './test.prefs'
         else:
             settings['prefs'] = '../test.prefs'
-
     # read out prefs and strip comments
     with open(settings['prefs'], 'r') as f:
-        lines = []
-        for line in f.readlines():
-            tokens = line.split('#')
-            lines.append(tokens[0])
-    # interpret as json and add to settings
-    prefs = json.loads('\n'.join(lines))
+        content = f.read()
+    # strip comments and empty lines
+    lines = []
+    for line in content.split('\n'):
+        tokens = line.split('#')
+        relevant = tokens[0]
+        if len(relevant.strip()) > 0:
+            lines.append(relevant)
+    try:
+        # interpret as json and add to settings
+        json_string = '\n'.join(lines)
+        prefs = json.loads(json_string)
+    except Exception as e:
+    # except ValueError as e:
+    # except json.decoder.JSONDecodeError as e:
+        _logJsonError(settings['prefs'], e, lines)
+        raise
+
     settings.update(prefs)
     # initialize a few settings
     if not 'include_test_files' in settings:
@@ -507,12 +549,77 @@ def _readPrefs(settings):
     if not 'count_errors' in settings:
         settings['count_errors'] = 0
 
+    if not 'debug_mode' in settings:
+        settings['debug_mode'] = False
+    # sanitize debug_mode
+    if '{}'.format(settings['debug_mode']).lower() == 'true':
+        settings['debug_mode'] = True
+    if not settings['debug_mode'] == True:
+        settings['debug_mode'] = False
+
     settings['cwd'] = os.getcwd()
     settings['context'] = resolveContext(settings)
 
     settings['subprocess'] = False
 
+# -----------------------------------------------------------------------------
+def _extractLineNumber(e):
+    """
+    """
+    lineno = -1
+    try:
+        right_side = str(e).split('line ')[1]
+        number = right_side.split(' ')[0]
+        lineno = int(number)
+    except Exception as e:
+        pass
+    return lineno
 
+# -----------------------------------------------------------------------------
+def _logJsonError(prefs_path, e, lines):
+    """
+    """
+    # extract line number from exception
+    print('DBG {}'.format(e.__class__))
+    offending_line = _extractLineNumber(e)
+
+    print('')
+    print('')
+    print('='*80)
+    print('= Prefs Error ' + ('='*66))
+    print('')
+    print('This prefs file does not contain valid JSON:')
+    print("       '{}'".format(prefs_path))
+    print('')
+    print("Error: '{}'".format(e))
+    print('')
+    print('Faulty JSON (after stripping comments):')
+    print('---------------------------------------')
+    print('')
+    for index, line in enumerate(lines):
+        lineno = index+1
+        source_line = '{}  {}'.format(str(lineno).rjust(3), line)
+        if lineno == 4: #offending_line:
+            printHighlighted(source_line)
+        else:
+            print(source_line)
+    print('')
+    print('='*80)
+    print('')
+
+# -----------------------------------------------------------------------------
+def printHighlighted(line):
+
+    try:
+        # try to use the awesome colorama package
+        styled = '{}{}{}{}'.format(colorama.Fore.WHITE,
+                                   colorama.Back.RED,
+                                   line,
+                                   colorama.Style.RESET_ALL)
+        print(styled)
+    except Exception as e:
+        # fall back to normal print
+        print(line)
 
 
 # -----------------------------------------------------------------------------
@@ -533,14 +640,13 @@ class FilteredTestLoader(unittest.TestLoader):
     """
 
     # -------------------------------------------------------------------------
-    def _match_path(self, path, full_path, pattern):
+    def _match_path(self, path, full_path, pattern, *args, **kwargs):
         """
         """
         # first pattern must be matched
         result = False
         if fnmatch(path, pattern[0]):
             result = True
-
             # at least one of the optional patterns must be matched
             optionals = pattern[1:]
             if len(optionals) > 0:
@@ -552,6 +658,78 @@ class FilteredTestLoader(unittest.TestLoader):
 
         return result
 
+
+# -----------------------------------------------------------------------------
+class TextTestRunner(unittest.TextTestRunner):
+    """
+    """
+
+    # -------------------------------------------------------------------------
+    def run(self, test, settings={}, *args, **kwargs):
+        """
+        """
+        self._attachSettingsToAllTestCases(test, settings)
+        return super(TextTestRunner, self).run(test, *args, **kwargs)
+
+    # -------------------------------------------------------------------------
+    def _attachSettingsToAllTestCases(self, test, settings):
+        """
+        """
+        if isinstance(test, TestCase):
+            test.settings = settings
+        elif isinstance(test, unittest.TestSuite):
+            for item in test._tests:
+                self._attachSettingsToAllTestCases(item, settings)
+
+
+# -----------------------------------------------------------------------------
+class TestCase(unittest.TestCase):
+    """
+    """
+
+    # --------------------------------------------------------------------------
+    def __init__(self, methodName='runTest', *args, **kwargs):
+        """
+        """
+        self.__settings = {}
+        super(TestCase, self).__init__(methodName, *args, **kwargs)
+
+    # --------------------------------------------------------------------------
+    @property
+    def settings(self):
+        return self.__settings
+    # --------------------------------------------------------------------------
+    @settings.setter
+    def settings(self, value):
+        if isinstance(value, dict):
+            self.__settings = value
+
+    # --------------------------------------------------------------------------
+    @property
+    def context(self):
+        return self.settings.get('context', 'unknown')
+
+    # --------------------------------------------------------------------------
+    @property
+    def context_settings(self):
+        all_details = self.settings.get('context_details', {})
+        return all_details.get(self.context, {})
+
+    # --------------------------------------------------------------------------
+    @classmethod
+    def setUpClass(cls, *args, **kwargs):
+        super(TestCase, cls).setUpClass(*args, **kwargs)
+        cls.logHeader()
+
+    # --------------------------------------------------------------------------
+    @classmethod
+    def logHeader(cls):
+        """Prints the test header."""
+        print('')
+        print('-' * 70)
+        print("    Running tests in '{}'".format(cls.__name__))
+        print('-' * 70)
+        sys.stdout.flush()
 
 
 # -----------------------------------------------------------------------------

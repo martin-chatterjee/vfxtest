@@ -3,16 +3,17 @@
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
-import unittest
+import vfxtest
 import os
 
 import awesome_module
 
 # -----------------------------------------------------------------------------
-class TestCase01(unittest.TestCase):
+class TestCase01(vfxtest.TestCase):
 
     # -------------------------------------------------------------------------
     def test01_(self):
+
         foo = awesome_module.fizz(3, 5)
         self.assertEqual(foo, 8)
 

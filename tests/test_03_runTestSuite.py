@@ -164,3 +164,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
         self.assertEqual(proof['count_files_run'], 0)
         self.assertEqual(proof['count_tests_run'], 0)
         self.assertEqual(proof['count_errors'], 0)
+
+# -----------------------------------------------------------------------------
+if __name__ == '__main__':
+    unittest.main()

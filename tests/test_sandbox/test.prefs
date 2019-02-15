@@ -2,12 +2,14 @@
 # vfxtest prefs file
 # -----------------------------------------------------------------------------
 # (This is essentially just a json file that supports comments)
-#
+
 {
     # temp storage folder for this test suite.
     # If it does not exist it will get created.
     # However it's parent folder however must already exist!
     "test_output" : "../test_output",
+
+    "debug_mode" : False,
 
     # --------------------------------
     "context_details" :
