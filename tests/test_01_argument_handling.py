@@ -183,7 +183,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
     def test11_collectSettings_invalid_prefs_file_prints_useful_error_and_raises_SystemExit(self):
         with mock.patch.object(vfxtest,
                                '_extractLineNumber',
-                               return_value=4):
+                               return_value=3):
             with self.assertRaises(SystemExit):
                 result = vfxtest.collectSettings(['--prefs', 'invalid_json.prefs'])
 

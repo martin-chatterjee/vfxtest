@@ -14,12 +14,12 @@ class RunNativeTestCase(unittest.TestCase):
 
     # -------------------------------------------------------------------------
     @classmethod
-    def setUpOnce(cls):
+    def setUpClass(cls):
         """
         """
     # -------------------------------------------------------------------------
     @classmethod
-    def tearDownOnce(cls):
+    def tearDownClass(cls):
         """
         """
     # -------------------------------------------------------------------------

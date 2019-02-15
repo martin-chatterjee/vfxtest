@@ -13,6 +13,11 @@ import awesome_module
 # -----------------------------------------------------------------------------
 class TestCase03(vfxtest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        tf = cls.createTestFolder('TestFolder_for_TestCase03')
+        print(tf)
+
     # -------------------------------------------------------------------------
     def test01_(self):
 

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import traceback
 import unittest
+import shutil
 
 # ensures Python 3 & 2 compatibility
 try: # pragma: no cover
@@ -695,6 +696,8 @@ class TestCase(unittest.TestCase):
     """
     """
 
+    __test_output = None
+
     # --------------------------------------------------------------------------
     def __init__(self, methodName='runTest', test_run=False,  *args, **kwargs):
         """
@@ -712,6 +715,7 @@ class TestCase(unittest.TestCase):
     def settings(self, value):
         if isinstance(value, dict):
             self.__settings = value
+            TestCase.__test_output = self.settings.get('test_output', None)
 
     # --------------------------------------------------------------------------
     @property
@@ -740,6 +744,18 @@ class TestCase(unittest.TestCase):
         print('-' * 70)
         sys.stdout.flush()
 
+    # --------------------------------------------------------------------------
+    @classmethod
+    def createTestFolder(cls, name):
+        """
+        """
+        test_folder = '{}{}{}'.format(TestCase.__test_output,
+                                      os.sep,
+                                      name)
+        if os.path.exists(test_folder):
+           shutil.rmtree(test_folder)
+        os.makedirs(test_folder)
+        return test_folder
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
