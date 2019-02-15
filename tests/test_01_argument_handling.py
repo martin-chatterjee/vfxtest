@@ -94,6 +94,8 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         self.assertEqual(result_a, result_b)
 
+        os.rmdir('./test_output')
+
     # -------------------------------------------------------------------------
     def test05_collectSettings_invalid_boolean_string_raises_SystemExit(self):
 
@@ -146,7 +148,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                                           os.sep,
                                                           'test.prefs'))
         os.chdir('..')
-
+        os.rmdir('./test_output')
     # -------------------------------------------------------------------------
     def test10_collectSettings_settings_in_environment_get_recovered(self):
 
@@ -178,6 +180,8 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         result_a['subprocess'] = None
         result_b['subprocess'] = None
         self.assertEqual(result_a, result_b)
+
+        os.rmdir('./test_output')
 
     # -------------------------------------------------------------------------
     def test11_collectSettings_invalid_prefs_file_prints_useful_error_and_raises_SystemExit(self):

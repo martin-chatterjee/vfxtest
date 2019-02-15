@@ -15,17 +15,20 @@ class TestCase03(vfxtest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        tf = cls.createTestFolder('TestFolder_for_TestCase03')
-        print(tf)
+        print('')
+        print("    [TestCase03]  accessed test_root in 'setUpClass': {}".format(cls.test_root))
+        sys.stdout.flush()
 
     # -------------------------------------------------------------------------
     def test01_(self):
+        tr = self.test_root
+        self.assertTrue(os.path.exists(tr))
 
         # retrieve settings in here
         current_context = self.context
-        print('>>> current context: {}'.format(current_context))
+        print('    [TestCase03]  current context: {}'.format(current_context))
         executable = self.context_settings.get('executable', None)
-        print('>>> executable:      {}'.format(executable))
+        print('    [TestCase03]  executable:      {}'.format(executable))
 
         foo = awesome_module.lorem(3, 5)
         self.assertEqual(foo, 8)

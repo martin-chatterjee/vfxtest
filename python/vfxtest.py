@@ -15,6 +15,7 @@ import sys
 import traceback
 import unittest
 import shutil
+import inspect
 
 # ensures Python 3 & 2 compatibility
 try: # pragma: no cover
@@ -105,7 +106,6 @@ def runStandalone(args=[]):
     """
     # collect and validate settings from arguments and preferences
     settings = collectSettings(args)
-
     # run test suite in current folder
     runTestSuite(settings)
 
@@ -135,6 +135,7 @@ def runTestSuite(settings, report=True):
             ctxt_settings['context'] = context
 
             _storeSettingsInEnv(ctxt_settings)
+
             wrapper = _getWrapperPath(ctxt_settings)
             executable = _getExecutable(ctxt_settings)
             path_to_myself = _getPathToMyself()
@@ -215,6 +216,7 @@ def runChildTestSuites(settings):
             if os.path.isdir(item_path):
                 child_settings['target'] = item_path
                 child_settings['context'] = item
+                print(child_settings['context'])
                 runTestSuite(child_settings)
 
     settings['count_files_run'] = child_settings['count_files_run']
@@ -677,34 +679,69 @@ class TextTestRunner(unittest.TextTestRunner):
     def run(self, test, settings={}, *args, **kwargs):
         """
         """
-        self._attachSettingsToAllTestCases(test, settings)
+        self._prepTestCases(test, settings)
         return super(TextTestRunner, self).run(test, *args, **kwargs)
 
     # -------------------------------------------------------------------------
-    def _attachSettingsToAllTestCases(self, test, settings):
+    def _createTestRootFolder(self, settings, test_case):
         """
         """
-        if isinstance(test, TestCase):
-            test.settings = settings
-        elif isinstance(test, unittest.TestSuite):
+        test_output = settings.get('test_output', None)
+        if not os.path.exists(test_output):
+            raise OSError("Invalid test_output: {}".format(test_output))
+
+        testsuite_root = '{}{}{}'.format(test_output,
+                                         os.sep,
+                                         test_case.__class__.__name__)
+        if os.path.exists(testsuite_root):
+           shutil.rmtree(testsuite_root)
+        os.makedirs(testsuite_root)
+        return testsuite_root
+
+    # -------------------------------------------------------------------------
+    def _prepTestCases(self, test, settings):
+        """
+        """
+        if isinstance(test, unittest.TestSuite):
             for item in test._tests:
-                self._attachSettingsToAllTestCases(item, settings)
+                if isinstance(item, unittest.TestCase):
+                    # We can't just do 'isinstance(item, TestCase)' in here
+                    # because this fails for TestTextRunners in child processes.
+                    # Instead fall back to text comparision of the parent classes.
+                    # Feels a bit dodgy, but works...
+                    base_classes = inspect.getmro(item.__class__)
+                    for bc in base_classes:
+                        if str(bc) == "<class 'vfxtest.TestCase'>":
+                            item.settings = settings
+                            item.test_root = self._createTestRootFolder(settings, item)
+                            return
+                elif isinstance(item, unittest.TestSuite):
+                    self._prepTestCases(item, settings)
 
 
 # -----------------------------------------------------------------------------
 class TestCase(unittest.TestCase):
     """
     """
-
-    __test_output = None
+    test_root = None
 
     # --------------------------------------------------------------------------
     def __init__(self, methodName='runTest', test_run=False,  *args, **kwargs):
         """
         """
         self.__settings = {}
+
         if not test_run:
             super(TestCase, self).__init__(methodName, *args, **kwargs)
+
+    # --------------------------------------------------------------------------
+    @property
+    def test_root(self):
+        return TestCase.test_root
+    # --------------------------------------------------------------------------
+    @test_root.setter
+    def test_root(self, value):
+        TestCase.test_root = value
 
     # --------------------------------------------------------------------------
     @property
@@ -715,7 +752,7 @@ class TestCase(unittest.TestCase):
     def settings(self, value):
         if isinstance(value, dict):
             self.__settings = value
-            TestCase.__test_output = self.settings.get('test_output', None)
+            TestCase.test_output = self.settings.get('test_output', None)
 
     # --------------------------------------------------------------------------
     @property
@@ -743,19 +780,6 @@ class TestCase(unittest.TestCase):
         print("    Running tests in '{}'".format(cls.__name__))
         print('-' * 70)
         sys.stdout.flush()
-
-    # --------------------------------------------------------------------------
-    @classmethod
-    def createTestFolder(cls, name):
-        """
-        """
-        test_folder = '{}{}{}'.format(TestCase.__test_output,
-                                      os.sep,
-                                      name)
-        if os.path.exists(test_folder):
-           shutil.rmtree(test_folder)
-        os.makedirs(test_folder)
-        return test_folder
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':

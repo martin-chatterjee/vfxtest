@@ -73,16 +73,16 @@ class TestCaseTestCase(unittest.TestCase):
         foo.settings = settings
         self.assertEqual(foo.context_settings, settings['context_details']['python3.x'])
 
-    # -------------------------------------------------------------------------
-    def test06_createTestFolder_works_as_expected(self):
+    # # -------------------------------------------------------------------------
+    # def test06_createTestFolder_works_as_expected(self):
 
-        settings = vfxtest.collectSettings()
-        self.assertTrue(os.path.exists(settings['test_output']))
-        foo = vfxtest.TestCase(test_run=True)
-        foo.settings = settings
+    #     settings = vfxtest.collectSettings()
+    #     self.assertTrue(os.path.exists(settings['test_output']))
+    #     foo = vfxtest.TestCase(test_run=True)
+    #     foo.settings = settings
 
-        proof = foo.createTestFolder('MyName')
-        self.assertEqual(proof, '{}{}{}'.format(settings['test_output'], os.sep, 'MyName'))
+    #     proof = foo.createTestFolder('MyName')
+    #     self.assertEqual(proof, '{}{}{}'.format(settings['test_output'], os.sep, 'MyName'))
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
