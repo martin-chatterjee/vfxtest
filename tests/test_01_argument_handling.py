@@ -3,9 +3,14 @@
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
-import unittest
-import os
 import json
+try:
+    import unittest.mock as mock
+except:
+    import mock
+
+import os
+import unittest
 
 import vfxtest
 
@@ -106,7 +111,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
             result = vfxtest.collectSettings(['--failfast', 'Nope'])
 
     # -------------------------------------------------------------------------
-    def test06_collectSettings_invalid_or_nonexistent_prefs_file_raises_SystemExit(self):
+    def test06_collectSettings_nonexistent_prefs_file_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
             result = vfxtest.collectSettings(['--prefs', 'does_not_exist.prefs'])
@@ -173,6 +178,29 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         result_a['subprocess'] = None
         result_b['subprocess'] = None
         self.assertEqual(result_a, result_b)
+
+    # -------------------------------------------------------------------------
+    def test11_collectSettings_invalid_prefs_file_prints_useful_error_and_raises_SystemExit(self):
+        with mock.patch.object(vfxtest,
+                               '_extractLineNumber',
+                               return_value=4):
+            with self.assertRaises(SystemExit):
+                result = vfxtest.collectSettings(['--prefs', 'invalid_json.prefs'])
+
+    # -------------------------------------------------------------------------
+    def test12_collectSettings_prefs_bool_values_defined_as_strings_get_converted(self):
+
+        result = vfxtest.collectSettings(['--prefs', 'boolean_as_string.prefs'])
+        self.assertTrue(result['debug_mode'])
+
+    # -------------------------------------------------------------------------
+    def test13__extractLineNumber_defaults_to_minus_one_on_internal_exception(self):
+
+        result = vfxtest._extractLineNumber('Expecting value: line 13 column 20 (char 59)')
+        self.assertEqual(result, 13)
+
+        result = vfxtest._extractLineNumber('Not a single line number in here...')
+        self.assertEqual(result, -1)
 
 
 # -----------------------------------------------------------------------------

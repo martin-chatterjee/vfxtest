@@ -9,9 +9,9 @@ set COMMAND=%EXECUTABLE% %VFXTEST%
 
 IF "%DEBUG_MODE%"=="True" (
     echo.
-    echo Resulting Command:
-    echo ------------------
-    echo         %COMMAND%
+    echo [DBG] Resulting Command:
+    echo       ------------------
+    echo       %COMMAND%
     echo.
     echo.
     echo.

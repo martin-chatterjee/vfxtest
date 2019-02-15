@@ -15,13 +15,20 @@ import sys
 import traceback
 import unittest
 
-try:
-    import colorama
-    colorama.init()
-except:
-    pass
+# ensures Python 3 & 2 compatibility
+try: # pragma: no cover
+    import unittest.mock as mock
+except: # pragma: no cover
+    import mock
 
 import coverage
+import colorama
+colorama.init()
+# map 'vfxttest.main()' to 'unittest.main()''
+main = unittest.main
+
+
+
 
 """
 NEXT STEPS
@@ -90,8 +97,9 @@ EXAMPLE USAGES
 """
 
 
+
 # -----------------------------------------------------------------------------
-def main(args=[]):
+def runStandalone(args=[]):
     """
     """
     # collect and validate settings from arguments and preferences
@@ -137,7 +145,8 @@ def runTestSuite(settings, report=True):
 
             print('')
             print('/'*80)
-            status_line = "// Running tests in subprocess for context '{}': ".format(context)
+            status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
+                           .format(os.path.basename(settings['target']), context))
             status_line += '/'*(80-len(status_line))
             print (status_line)
             print('')
@@ -146,13 +155,16 @@ def runTestSuite(settings, report=True):
                 print('')
                 print('[DBG] Wrapper call:')
                 print('      -------------')
-                print('              ' + ' '.join(args))
+                print('      ' + ' '.join(args))
+                print('')
                 print('[DBG] target folder:')
                 print('      -------------')
-                print('              ' + ctxt_settings['target'])
+                print('      ' + ctxt_settings['target'])
+                print('')
                 print('[DBG] target context:')
                 print('      -------------')
-                print('              ' + ctxt_settings['context'])
+                print('      ' + ctxt_settings['context'])
+                print('')
                 print('')
 
 
@@ -172,7 +184,8 @@ def runTestSuite(settings, report=True):
 
             if settings['debug_mode']:
                 print('')
-                print('[DBG] --> Process Return Code: {}'.format(proc.returncode))
+                print('[DBG] --> Process Return Code: {}'
+                       .format(proc.returncode))
                 print('')
 
             print('')
@@ -303,10 +316,12 @@ def _encodeStatsIntoReturnCode(settings):
     # cap all count stats into range 0 - 999
     for item in ['count_files_run', 'count_tests_run', 'count_errors']:
         if settings[item] > 999:
-            print("Warning: '{}' run was {} - capping to 999".format(item, settings[item]))
+            print("Warning: '{}' run was {} - capping to 999"
+                   .format(item, settings[item]))
             settings[item] = 999
         elif settings[item] < 0:
-            print("Warning: '{}' run was {} - capping to 0".format(item, settings[item]))
+            print("Warning: '{}' run was {} - capping to 0"
+                   .format(item, settings[item]))
             settings[item] = 0
 
     result = 0
@@ -472,17 +487,15 @@ def _getSettings(arg_parser, args):
         test_output = settings['test_output']
         parent_folder = os.path.dirname(test_output)
         if not os.path.exists(parent_folder):
-            raise OSError('Folder does not exist:\n'
-                                    '{}'.format(parent_folder))
+            raise OSError("Folder does not exist: '{}'"
+                           .format(parent_folder))
         if not os.path.exists(test_output):
             os.makedirs(test_output)
 
     except Exception as e:
-        # if not isinstance(e, json.decoder.JSONDecodeError):
-        print(e.__class__)
-        print(isinstance(e, ValueError))
-        # if not isinstance(e, ValueError):
-        print('Failed to read and conform preferences:\n{}\n{}'.format(e, traceback.format_exc()))
+        if not isinstance(e, ValueError):
+            print('Failed to read and conform preferences:\n{}\n{}'
+                   .format(e, traceback.format_exc()))
         raise(SystemExit)
 
     return settings
@@ -539,7 +552,8 @@ def _readPrefs(settings):
     if not 'context_details' in settings:
         settings['context_details'] = {}
     if not 'wrapper_scripts' in settings:
-        wrapper_scripts = '{}{}wrapper_scripts'.format(os.path.dirname(__file__), os.sep)
+        wrapper_scripts = ('{}{}wrapper_scripts'
+                            .format(os.path.dirname(__file__), os.sep))
         settings['wrapper_scripts'] = wrapper_scripts
 
     if not 'count_files_run' in settings:
@@ -579,9 +593,7 @@ def _extractLineNumber(e):
 def _logJsonError(prefs_path, e, lines):
     """
     """
-    # extract line number from exception
-    print('DBG {}'.format(e.__class__))
-    offending_line = _extractLineNumber(e)
+    offending_lineno = _extractLineNumber(e)
 
     print('')
     print('')
@@ -599,7 +611,7 @@ def _logJsonError(prefs_path, e, lines):
     for index, line in enumerate(lines):
         lineno = index+1
         source_line = '{}  {}'.format(str(lineno).rjust(3), line)
-        if lineno == 4: #offending_line:
+        if lineno == offending_lineno:
             printHighlighted(source_line)
         else:
             print(source_line)
@@ -610,16 +622,12 @@ def _logJsonError(prefs_path, e, lines):
 # -----------------------------------------------------------------------------
 def printHighlighted(line):
 
-    try:
-        # try to use the awesome colorama package
-        styled = '{}{}{}{}'.format(colorama.Fore.WHITE,
-                                   colorama.Back.RED,
-                                   line,
-                                   colorama.Style.RESET_ALL)
-        print(styled)
-    except Exception as e:
-        # fall back to normal print
-        print(line)
+    # uses the awesome colorama package
+    styled = '{}{}{}{}'.format(colorama.Fore.WHITE,
+                               colorama.Back.RED,
+                               line,
+                               colorama.Style.RESET_ALL)
+    print(styled)
 
 
 # -----------------------------------------------------------------------------
@@ -688,11 +696,12 @@ class TestCase(unittest.TestCase):
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, methodName='runTest', *args, **kwargs):
+    def __init__(self, methodName='runTest', test_run=False,  *args, **kwargs):
         """
         """
         self.__settings = {}
-        super(TestCase, self).__init__(methodName, *args, **kwargs)
+        if not test_run:
+            super(TestCase, self).__init__(methodName, *args, **kwargs)
 
     # --------------------------------------------------------------------------
     @property
@@ -734,5 +743,5 @@ class TestCase(unittest.TestCase):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    sys.exit(main(sys.argv[1:])) # pragma: no cover
+    sys.exit(runStandalone(sys.argv[1:])) # pragma: no cover
 

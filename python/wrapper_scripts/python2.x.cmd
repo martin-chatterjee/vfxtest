@@ -11,7 +11,7 @@ IF "%DEBUG_MODE%"=="True" (
     echo.
     echo [DBG] Resulting Command:
     echo       ------------------
-    echo               %COMMAND%
+    echo       %COMMAND%
     echo.
     echo.
     echo.

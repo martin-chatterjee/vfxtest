@@ -56,6 +56,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
             os.remove(cov_file)
 
         settings['context'] = 'python3.x'
+        settings['debug_mode'] = True
 
         vfxtest.runTestSuite(settings=settings)
         self.assertEqual(settings['count_files_run'], 2)

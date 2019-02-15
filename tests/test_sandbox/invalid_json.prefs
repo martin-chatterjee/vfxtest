@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# vfxtest prefs file
+# INVALID vfxtest prefs file
 # -----------------------------------------------------------------------------
 # (This is essentially just a json file that supports comments)
 
@@ -9,7 +9,8 @@
     # However it's parent folder however must already exist!
     "test_output" : "../test_output",
 
-    "debug_mode" : false,
+    # !!! The following line is NOT a valid json line: must be 'false' !!!!
+    "debug_mode" : False,
 
     # --------------------------------
     "context_details" :

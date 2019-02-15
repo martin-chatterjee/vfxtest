@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# vfxtest prefs file
+#  vfxtest prefs file
 # -----------------------------------------------------------------------------
 # (This is essentially just a json file that supports comments)
 
@@ -9,7 +9,8 @@
     # However it's parent folder however must already exist!
     "test_output" : "../test_output",
 
-    "debug_mode" : false,
+    # !!! This string value gets gracefully converted to a boolean !!!
+    "debug_mode" : "True",
 
     # --------------------------------
     "context_details" :
