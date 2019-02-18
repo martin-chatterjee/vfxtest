@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
+# Licensed under MIT License (--> LICENSE.txt)
 # -----------------------------------------------------------------------------
 
 import argparse
 import copy
 from fnmatch import fnmatch
 import glob
+import inspect
 import json
 import os
 import platform
 import subprocess
+import shutil
 import sys
 import traceback
 import unittest
-import shutil
-import inspect
 
-# ensures Python 3 & 2 compatibility
 try: # pragma: no cover
     import unittest.mock as mock
 except: # pragma: no cover
@@ -25,68 +25,58 @@ except: # pragma: no cover
 
 import coverage
 import colorama
-colorama.init()
 
-# map 'vfxttest.main()' to 'unittest.main()''
+colorama.init()
 main = unittest.main
 
 
+"""'vfxtest' is a thin wrapper around unittest, coverage and mock.
+
+It's purpose is to manage and run multiple test suites testing a python
+codebase that gets used inside multiple different contexts commonly found
+in a VFX production environment.
+
+Such common contexts in a VFX production environment include:
+    - standalone Python 2.7.x
+    - standalone Python 3.7.x
+    - mayapy/maya
+    - hython/houdini
+    - nuke
+    - ...
+
+'vfxtest' lets you write and run test suites for all those contexts and then
+provides you with combined code coverage metrics for all of them.
 
 """
-NEXT STEPS
-----------
-
-USAGE
------
-
-- run 'vfxtest' in any folder:
-    - all tests directly inside this folder will be run with the current
-      python interpreter
-    - all subfolders that contain tests will be found:
-        - based on the name of the subfolder and the settings all those
-          tests will be run in spawned test run
-    - at the end all coverage information will get combined and reported.
-
-
-- defaults for main 'vfxtest' process:
-    clear=True, failfast=True
-
-- defaults for child processes:
-    clear=True, failfast=True
-
-- cfg file is assumed in the current folder
-
-- test_output is assumed to be './test_output' (can be set in cfg file)
-
-
-EXAMPLE USAGES
---------------
-
-    vfxtest.py
-
-    vfxtest.py --target ./subfolder
-
-    vfxtest.py --failfast false --limit 12
-
-    vfxtest.py -t ./python 03
-
-"""
-
 
 
 # -----------------------------------------------------------------------------
-def runStandalone(args=[]):
+def runMain(args=[]):
+    """Main function that gets executed when 'vfxtest' gets run.
+
+    Collects and validates 'settings' from both the passed in arguments as
+    well as the config file.
+    Then runs the test suite found directly in the 'target' folder specified
+    in 'settings', followee by all other test suites found in subfolders of
+    'target'.
+    Finally combines all coverage reports into one, and reports it both to
+    STDOUT and to HTML.
+
+    Args:
+        args (list)     :   list of command line arguments. (optional)
+
+    Returns:
+        (int)           :   statistics encoded into an 'exitcode' integer
+
+    Raises:
+        (SystemExit)    :   on missing or incompatible settings or arguments
+
     """
-    """
-    # collect and validate settings from arguments and preferences
     settings = collectSettings(args)
-    # run test suite in current folder
     runTestSuite(settings)
 
     if settings['subprocess'] is False:
-        # run all child context test suites
         runChildTestSuites(settings)
-        # combine coverages
         combineCoverages(settings)
 
     exit_status = _encodeStatsIntoReturnCode(settings)
@@ -94,8 +84,48 @@ def runStandalone(args=[]):
 
 
 # -----------------------------------------------------------------------------
-def runTestSuite(settings, report=True):
+def collectSettings(args=[]):
+    """Collects and validates 'settings' from both the passed in arguments
+    as well as the config file.
+
+    Args:
+        args (list)     :   list of command line arguments. (optional)
+
+    Returns:
+        (dict)          :   dictionary holding all settings
+
+    Raises:
+        (SystemExit)    :   on missing or incompatible settings or arguments
+
+
     """
+    # define arguments
+    arg_parser = _defineArguments()
+    # validate preferences and add to settings
+    settings = _getSettings(arg_parser, args)
+
+    return settings
+
+
+# -----------------------------------------------------------------------------
+def runTestSuite(settings, report=True):
+    """Runs the test suite found inside the 'target' folder specified in
+    'settings'.
+
+    If runTestSuite gets called in 'native' context or inside a
+    child subprocess then this will execute the test suite natively, meaning
+    inside this current process and thereby using the current
+    Python interpreter.
+    Otherwise it will attempt to spawn an appropriate subprocess for
+    this context that will then execute the test suite.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+        report (bool)       :  will print a coverage report to STDOUT, if True
+                               (default: True)
+    Raises:
+        (Exception)         : any internal exception will be re-raised
+
     """
     if settings['context'] == 'native' or settings['subprocess'] == True:
         runNative(settings, report=report)
@@ -179,7 +209,18 @@ def runTestSuite(settings, report=True):
 
 # -----------------------------------------------------------------------------
 def runChildTestSuites(settings):
-    """
+    """Runs every child test suite found in 'target' in it's appropriate
+    context.
+
+    Every subfolder of 'target' that is named like a known context gets
+    run.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    Raises:
+        (Exception)         : any internal exception will be re-raised
+
     """
     child_settings = settings.copy()
 
@@ -197,9 +238,24 @@ def runChildTestSuites(settings):
     settings['count_tests_run'] = child_settings['count_tests_run']
     settings['count_errors'] = child_settings['count_errors']
 
+
 # -----------------------------------------------------------------------------
 def runNative(settings, report=True, use_coverage=True):
-    """
+    """Runs the test suite found in 'target' natively in this current process.
+
+    Locates all valid test files, filters them down by filter tokens and by
+    limit, then runs them.
+    Tracks coverage, and updates statistics in 'settings'.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+        report (bool)       :  will print a coverage report to STDOUT, if True
+                               (default: True)
+        use_coverage (bool) :  will track coverage if True.
+                               (default: True)
+    Raises:
+        (Exception)         : any internal exception will be re-raised
+
     """
     if use_coverage:
         cov = _startCoverage(settings)
@@ -226,30 +282,16 @@ def runNative(settings, report=True, use_coverage=True):
         #     coverage does not work inside of another coverage run
         _stopCoverage(settings, cov, report=report) # pragma: no cover
 
-# -----------------------------------------------------------------------------
-def collectSettings(args=[]):
-    """
-    """
-    # define arguments
-    arg_parser = _defineArguments()
-    # validate preferences and add to settings
-    settings = _getSettings(arg_parser, args)
-
-    return settings
-
-
-# -----------------------------------------------------------------------------
-def resolveContext(settings):
-    """
-    """
-    context = os.path.basename(settings['target'])
-    if not context in settings['context_details']:
-        context = 'native'
-    return context
 
 # -----------------------------------------------------------------------------
 def combineCoverages(settings):
-    """
+    """Combines all .coverage files found into on overall coverage data set.
+
+    Reports this coverage both to STDOUT as well as to HTML.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
     """
     test_output = settings['test_output']
     data_file='{}/.coverage'.format(test_output)
@@ -262,6 +304,28 @@ def combineCoverages(settings):
         cov.html_report(directory='{}/_coverage_html'.format(test_output))
     except coverage.misc.CoverageException as e:
         print('Coverage: no data to report')
+
+
+# -----------------------------------------------------------------------------
+def resolveContext(settings):
+    """Resolves the current content by comparing the name of the current
+    'target' folder to all known contexts in 'settings'.
+
+    If the context is know, it is returned. Otherwise 'native' gets returned
+    as default context.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    Returns:
+        (string)            :  resolved context
+
+    """
+    context = os.path.basename(settings['target'])
+    if not context in settings['context_details']:
+        context = 'native'
+    return context
+
 
 # -----------------------------------------------------------------------------
 def _defineArguments():
@@ -285,6 +349,7 @@ def _defineArguments():
                         help='specify tokens that filter down the test files by name.')
 
     return parser
+
 
 # -----------------------------------------------------------------------------
 def _encodeStatsIntoReturnCode(settings):
@@ -589,7 +654,7 @@ def _logJsonError(cfg_path, e, lines):
         lineno = index+1
         source_line = '{}  {}'.format(str(lineno).rjust(3), line)
         if lineno == offending_lineno:
-            printHighlighted(source_line)
+            _printHighlighted(source_line)
         else:
             print(source_line)
     print('')
@@ -597,7 +662,7 @@ def _logJsonError(cfg_path, e, lines):
     print('')
 
 # -----------------------------------------------------------------------------
-def printHighlighted(line):
+def _printHighlighted(line):
 
     # uses the awesome colorama package
     styled = '{}{}{}{}'.format(colorama.Fore.WHITE,
@@ -621,12 +686,29 @@ def __stringToBool(value):
 
 # -----------------------------------------------------------------------------
 class FilteredTestLoader(unittest.TestLoader):
-    """
+    """Test Loader that accepts a list of patterns as value for 'pattern'.
+
+    The first pattern MUST be matched for a Test File to be included.
+    (This is the equivalent of the standard unittest.TestLoader 'pattern')
+
+    All other patterns are optional. For a file to be included it must
+    match at least one of those optional patterns (--> an OR operation)
+
     """
 
     # -------------------------------------------------------------------------
     def _match_path(self, path, full_path, pattern, *args, **kwargs):
-        """
+        """Test Loader that accepts a list of patterns as value for 'pattern'.
+
+        The first pattern MUST be matched for a Test File to be included.
+        (This is the equivalent of the standard unittest.TestLoader 'pattern')
+
+        All other patterns are optional. For a file to be included it must
+        match at least one of those optional patterns (--> an OR operation)
+
+        Args:
+            pattern (list)   : list of at least one string pattern
+
         """
         # first pattern must be matched
         result = False
@@ -646,7 +728,13 @@ class FilteredTestLoader(unittest.TestLoader):
 
 # -----------------------------------------------------------------------------
 class TextTestRunner(unittest.TextTestRunner):
-    """
+    """TestRunner that also injects 'settings' into each test case and
+    prepares a sandboxed test root folder.
+
+    This you can query the settings and test_root from inside your test case
+    implementation.
+
+
     """
 
     # -------------------------------------------------------------------------
@@ -658,7 +746,27 @@ class TextTestRunner(unittest.TextTestRunner):
 
     # -------------------------------------------------------------------------
     def _createTestRootFolder(self, settings, test_case):
-        """
+        """Creates a sandboxed test_root folder inside the 'test_output'
+        folder specified in 'settings'. The name of the test_root folder
+        will match the name of the TestCase.
+
+        If the test_root folder already exists, it will get deleted
+        and recreated.
+
+        However if 'test_output' does not exist it will raise an OSError.
+
+        Args:
+            settings (dict)      :  dictionary holding all our settings
+            test_case (TestCase) :  TestCase for which to create the test_root
+                                    folder.
+                                    (default: True)
+
+        Returns:
+            (string)        :  absolute path of test_root
+
+        Raises:
+            (OSError)       :  if 'test_output' does not exist
+
         """
         test_output = settings.get('test_output', None)
         if not os.path.exists(test_output):
@@ -681,7 +789,7 @@ class TextTestRunner(unittest.TextTestRunner):
                 if isinstance(item, unittest.TestCase):
                     # We can't just do 'isinstance(item, TestCase)' in here
                     # because this fails for TestTextRunners in child processes.
-                    # Instead fall back to text comparision of the parent classes.
+                    # Instead we fall back to text comparision of the parent classes.
                     # Feels a bit dodgy, but works...
                     base_classes = inspect.getmro(item.__class__)
                     for bc in base_classes:
@@ -695,7 +803,9 @@ class TextTestRunner(unittest.TextTestRunner):
 
 # -----------------------------------------------------------------------------
 class TestCase(unittest.TestCase):
-    """
+    """TestCase that also provides easy access to associated data such
+    as 'test_root',  'setttings' or 'context'.
+
     """
     __test_root = None
 
@@ -755,7 +865,8 @@ class TestCase(unittest.TestCase):
         print('-' * 70)
         sys.stdout.flush()
 
+
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    sys.exit(runStandalone(sys.argv[1:])) # pragma: no cover
+    sys.exit(runMain(sys.argv[1:])) # pragma: no cover
 

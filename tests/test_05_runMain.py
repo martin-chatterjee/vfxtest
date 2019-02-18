@@ -11,7 +11,7 @@ import vfxtest
 
 
 # -----------------------------------------------------------------------------
-class RunStandaloneTestCase(unittest.TestCase):
+class RunMainTestCase(unittest.TestCase):
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -37,9 +37,9 @@ class RunStandaloneTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test01_runStandalone_filtered_works_as_expected(self):
+    def test01_runMain_filtered_works_as_expected(self):
 
-        returnvalue = vfxtest.runStandalone(['01', '03'])
+        returnvalue = vfxtest.runMain(['01', '03'])
 
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
@@ -48,9 +48,9 @@ class RunStandaloneTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test02_runStandalone_limit_works_as_expected(self):
+    def test02_runMain_limit_works_as_expected(self):
 
-        returnvalue = vfxtest.runStandalone(['--limit', '2'])
+        returnvalue = vfxtest.runMain(['--limit', '2'])
         print(returnvalue)
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
@@ -59,9 +59,9 @@ class RunStandaloneTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test03_runStandalone_with_empty_filtered_result_works_as_expected(self):
+    def test03_runMain_with_empty_filtered_result_works_as_expected(self):
 
-        returnvalue = vfxtest.runStandalone(['asdfg',])
+        returnvalue = vfxtest.runMain(['asdfg',])
         print(returnvalue)
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
@@ -70,9 +70,9 @@ class RunStandaloneTestCase(unittest.TestCase):
         self.assertEqual(proof['count_errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test04_runStandalone_works_as_expected(self):
+    def test04_runMain_works_as_expected(self):
 
-        returnvalue = vfxtest.runStandalone()
+        returnvalue = vfxtest.runMain()
 
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
