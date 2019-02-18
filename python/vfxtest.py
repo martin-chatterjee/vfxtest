@@ -26,41 +26,15 @@ except: # pragma: no cover
 import coverage
 import colorama
 colorama.init()
+
 # map 'vfxttest.main()' to 'unittest.main()''
 main = unittest.main
-
 
 
 
 """
 NEXT STEPS
 ----------
-
-*** - retrieve current test file name for logging
-*** - make settings available inside test case methods
-- review and port mock parts
-- add debug output mode
-- build and test all our wrapper scripts:
-    mayapy
-    maya
-    hython
-    houdini
-- build the vfxtest.cmd/.sh wrappers
-- read up on pip
-- documentation
-
-
-
-*** - move --settings into environment variable
-***- make sure encode/decode plays nice
-***- refactor main() once more
-
-
-*** - serialize full settings dict and pass it in as a command line argument
-
-*** [- append executable index to coverage suffix --> .coverage.python.0]
-*** - full test case with two separate child context_details
-
 
 USAGE
 -----
@@ -80,9 +54,9 @@ USAGE
 - defaults for child processes:
     clear=True, failfast=True
 
-- prefs file is assumed in the current folder
+- cfg file is assumed in the current folder
 
-- test_output is assumed to be './test_output' (can be set in prefs file)
+- test_output is assumed to be './test_output' (can be set in cfg file)
 
 
 EXAMPLE USAGES
@@ -299,10 +273,10 @@ def _defineArguments():
                         help='target folder path (defaults to current working directory)')
     parser.add_argument('-f', '--failfast', type=__stringToBool, default=True,
                         help='Stops execution of test suite on first error.')
-    parser.add_argument('-p', '--prefs', metavar='', type=str, default=None,
-                        help="path of the .prefs file to use. "
+    parser.add_argument('-p', '--cfg', metavar='', type=str, default=None,
+                        help="path of the .cfg file to use. "
                              ""
-                             "Defaults to 'test.prefs' in:"
+                             "Defaults to 'vfxtest.cfg' in:"
                              "    - the current working directory"
                              "    - the one root dir of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
@@ -476,14 +450,14 @@ def _getSettings(arg_parser, args):
         # start with arguments
         settings = vars(arg_parser.parse_args(args=args))
 
-        # use settings in environment if present, fall back to prefs file
+        # use settings in environment if present, fall back to cfg file
         if 'vfxtest_settings' in os.environ:
             _recoverSettingsFromEnv(settings)
         else:
-            _readPrefs(settings)
+            _readConfig(settings)
 
         # make all paths absolute
-        for key in ['prefs', 'target', 'test_output']:
+        for key in ['cfg', 'target', 'test_output']:
             settings[key] = os.path.abspath(settings[key])
 
         # create 'test_output' if needed, but never create it's parent folder
@@ -497,7 +471,7 @@ def _getSettings(arg_parser, args):
 
     except Exception as e:
         if not isinstance(e, ValueError):
-            print('Failed to read and conform preferences:\n{}\n{}'
+            print('Failed to read and conform config:\n{}\n{}'
                    .format(e, traceback.format_exc()))
         raise(SystemExit)
 
@@ -515,17 +489,17 @@ def _recoverSettingsFromEnv(settings):
     settings['subprocess'] = True
 
 # -----------------------------------------------------------------------------
-def _readPrefs(settings):
+def _readConfig(settings):
     """
     """
-    # prefer 'test.prefs' in current folder, fallback to parent folder
-    if settings['prefs'] is None:
-        if os.path.exists('./test.prefs'):
-            settings['prefs'] = './test.prefs'
+    # prefer 'vfxtest.cfg' in current folder, fallback to parent folder
+    if settings['cfg'] is None:
+        if os.path.exists('./vfxtest.cfg'):
+            settings['cfg'] = './vfxtest.cfg'
         else:
-            settings['prefs'] = '../test.prefs'
-    # read out prefs and strip comments
-    with open(settings['prefs'], 'r') as f:
+            settings['cfg'] = '../vfxtest.cfg'
+    # read out cfg and strip comments
+    with open(settings['cfg'], 'r') as f:
         content = f.read()
     # strip comments and empty lines
     lines = []
@@ -537,14 +511,14 @@ def _readPrefs(settings):
     try:
         # interpret as json and add to settings
         json_string = '\n'.join(lines)
-        prefs = json.loads(json_string)
+        cfg = json.loads(json_string)
     except Exception as e:
     # except ValueError as e:
     # except json.decoder.JSONDecodeError as e:
-        _logJsonError(settings['prefs'], e, lines)
+        _logJsonError(settings['cfg'], e, lines)
         raise
 
-    settings.update(prefs)
+    settings.update(cfg)
     # initialize a few settings
     if not 'include_test_files' in settings:
         settings['include_test_files'] = False
@@ -593,7 +567,7 @@ def _extractLineNumber(e):
     return lineno
 
 # -----------------------------------------------------------------------------
-def _logJsonError(prefs_path, e, lines):
+def _logJsonError(cfg_path, e, lines):
     """
     """
     offending_lineno = _extractLineNumber(e)
@@ -601,10 +575,10 @@ def _logJsonError(prefs_path, e, lines):
     print('')
     print('')
     print('='*80)
-    print('= Prefs Error ' + ('='*66))
+    print('= cfg Error ' + ('='*66))
     print('')
-    print('This prefs file does not contain valid JSON:')
-    print("       '{}'".format(prefs_path))
+    print('This cfg file does not contain valid JSON:')
+    print("       '{}'".format(cfg_path))
     print('')
     print("Error: '{}'".format(e))
     print('')
@@ -723,7 +697,7 @@ class TextTestRunner(unittest.TextTestRunner):
 class TestCase(unittest.TestCase):
     """
     """
-    test_root = None
+    __test_root = None
 
     # --------------------------------------------------------------------------
     def __init__(self, methodName='runTest', test_run=False,  *args, **kwargs):
@@ -737,11 +711,11 @@ class TestCase(unittest.TestCase):
     # --------------------------------------------------------------------------
     @property
     def test_root(self):
-        return TestCase.test_root
+        return TestCase.__test_root
     # --------------------------------------------------------------------------
     @test_root.setter
     def test_root(self, value):
-        TestCase.test_root = value
+        TestCase.__test_root = value
 
     # --------------------------------------------------------------------------
     @property

@@ -73,6 +73,36 @@ class TestCaseTestCase(unittest.TestCase):
         foo.settings = settings
         self.assertEqual(foo.context_settings, settings['context_details']['python3.x'])
 
+    # -------------------------------------------------------------------------
+    def test06_TextTestRunner__createTestRootFolder_invalid_test_output_raises_OSError(self):
+
+        invalid_test_output = os.path.abspath('./does/not/exist')
+        self.assertFalse(os.path.exists(invalid_test_output))
+
+        runner = vfxtest.TextTestRunner()
+        settings = vfxtest.collectSettings()
+        settings['test_output'] = invalid_test_output
+
+        with self.assertRaises(OSError):
+            runner._createTestRootFolder(settings=settings, test_case=None)
+
+    # -------------------------------------------------------------------------
+    def test07_test_root_sets_and_gets_class_variable(self):
+
+        a = vfxtest.TestCase(test_run=True)
+        b = vfxtest.TestCase(test_run=True)
+
+        # self.assertEqual(a.test_root, None)
+        # self.assertEqual(a.test_root, b.test_root)
+
+        a.test_root = './foo/bar'
+        self.assertEqual(a.test_root, './foo/bar')
+        self.assertEqual(a.test_root, b.test_root)
+
+        b.test_root = './fizz/buzz'
+        self.assertEqual(b.test_root, './fizz/buzz')
+        self.assertEqual(a.test_root, b.test_root)
+
     # # -------------------------------------------------------------------------
     # def test06_createTestFolder_works_as_expected(self):
 

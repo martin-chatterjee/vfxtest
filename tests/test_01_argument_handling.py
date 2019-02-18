@@ -61,8 +61,8 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(result['target'], os.getcwd())
         self.assertEqual(result['failfast'], True)
-        self.assertEqual(result['prefs'], os.sep.join([result['target'],
-                                                       'test.prefs']))
+        self.assertEqual(result['cfg'], os.sep.join([result['target'],
+                                                       'vfxtest.cfg']))
         self.assertEqual(result['limit'], 0)
         self.assertEqual(result['filter_tokens'], [])
         self.assertEqual(result['cwd'], os.getcwd())
@@ -72,13 +72,13 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         result_a = vfxtest.collectSettings(['--target', './subfolder',
                                        '--failfast', 'False',
-                                       '--prefs', './other.prefs',
+                                       '--cfg', './other.cfg',
                                        '--limit', '13',
                                        'foo', 'bar', 'baz'])
 
         result_b = vfxtest.collectSettings(['-t', './subfolder',
                                        '-f', 'False',
-                                       '-p', './other.prefs',
+                                       '-p', './other.cfg',
                                        '-l', '13',
                                        'foo', 'bar', 'baz'])
 
@@ -86,9 +86,9 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                                            os.sep,
                                                            'subfolder'))
         self.assertEqual(result_a['failfast'], False)
-        self.assertEqual(result_a['prefs'], '{}{}{}'.format(os.getcwd(),
+        self.assertEqual(result_a['cfg'], '{}{}{}'.format(os.getcwd(),
                                                           os.sep,
-                                                          'other.prefs'))
+                                                          'other.cfg'))
         self.assertEqual(result_a['limit'], 13)
         self.assertEqual(result_a['filter_tokens'], ['foo', 'bar', 'baz'])
 
@@ -113,18 +113,18 @@ class ArgumentHandlingTestCase(unittest.TestCase):
             result = vfxtest.collectSettings(['--failfast', 'Nope'])
 
     # -------------------------------------------------------------------------
-    def test06_collectSettings_nonexistent_prefs_file_raises_SystemExit(self):
+    def test06_collectSettings_nonexistent_cfg_file_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
-            result = vfxtest.collectSettings(['--prefs', 'does_not_exist.prefs'])
+            result = vfxtest.collectSettings(['--cfg', 'does_not_exist.cfg'])
 
 
     # -------------------------------------------------------------------------
     def test07_collectSettings_nonexistent_test_output_parent_folder_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
-            result = vfxtest.collectSettings(['--prefs',
-                                              './test_output-non-existent-parent-folder.prefs'])
+            result = vfxtest.collectSettings(['--cfg',
+                                              './test_output-non-existent-parent-folder.cfg'])
 
     # -------------------------------------------------------------------------
     def test08_collectSettings_nonexistent_test_output_folder_gets_created(self):
@@ -132,21 +132,21 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         if os.path.exists('./remove_me'):
             os.rmdir('./remove_me')
 
-        result = vfxtest.collectSettings(['--prefs',
-                                          './test_output-create-folder.prefs'])
+        result = vfxtest.collectSettings(['--cfg',
+                                          './test_output-create-folder.cfg'])
 
         self.assertTrue(os.path.exists('./remove_me'))
         os.rmdir('./remove_me')
 
     # -------------------------------------------------------------------------
-    def test09_collectSettings_falls_back_to_prefs_in_parent_folder(self):
+    def test09_collectSettings_falls_back_to_cfg_in_parent_folder(self):
 
         cwd = os.getcwd()
         os.chdir('./python')
         result = vfxtest.collectSettings([])
-        self.assertEqual(result['prefs'], '{}{}{}'.format(cwd,
+        self.assertEqual(result['cfg'], '{}{}{}'.format(cwd,
                                                           os.sep,
-                                                          'test.prefs'))
+                                                          'vfxtest.cfg'))
         os.chdir('..')
         os.rmdir('./test_output')
     # -------------------------------------------------------------------------
@@ -154,7 +154,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         result_a = vfxtest.collectSettings(['--target', './subfolder',
                                             '--failfast', 'False',
-                                            '--prefs', './other.prefs',
+                                            '--cfg', './other.cfg',
                                             '--limit', '13',
                                             'foo', 'bar', 'baz'])
 
@@ -162,9 +162,9 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                                            os.sep,
                                                            'subfolder'))
         self.assertEqual(result_a['failfast'], False)
-        self.assertEqual(result_a['prefs'], '{}{}{}'.format(os.getcwd(),
+        self.assertEqual(result_a['cfg'], '{}{}{}'.format(os.getcwd(),
                                                           os.sep,
-                                                          'other.prefs'))
+                                                          'other.cfg'))
         self.assertEqual(result_a['limit'], 13)
         self.assertEqual(result_a['filter_tokens'], ['foo', 'bar', 'baz'])
 
@@ -184,17 +184,17 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         os.rmdir('./test_output')
 
     # -------------------------------------------------------------------------
-    def test11_collectSettings_invalid_prefs_file_prints_useful_error_and_raises_SystemExit(self):
+    def test11_collectSettings_invalid_cfg_file_prints_useful_error_and_raises_SystemExit(self):
         with mock.patch.object(vfxtest,
                                '_extractLineNumber',
                                return_value=3):
             with self.assertRaises(SystemExit):
-                result = vfxtest.collectSettings(['--prefs', 'invalid_json.prefs'])
+                result = vfxtest.collectSettings(['--cfg', 'invalid_json.cfg'])
 
     # -------------------------------------------------------------------------
-    def test12_collectSettings_prefs_bool_values_defined_as_strings_get_converted(self):
+    def test12_collectSettings_cfg_bool_values_defined_as_strings_get_converted(self):
 
-        result = vfxtest.collectSettings(['--prefs', 'boolean_as_string.prefs'])
+        result = vfxtest.collectSettings(['--cfg', 'boolean_as_string.cfg'])
         self.assertTrue(result['debug_mode'])
 
     # -------------------------------------------------------------------------
@@ -209,4 +209,4 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    unittest.main()
+    vfxtest.main()
