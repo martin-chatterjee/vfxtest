@@ -171,6 +171,18 @@ def runTestSuite(settings, report=True):
                     dcc_settings_root,
                     str(settings['debug_mode'])]
 
+            # deal with virtualenv activation and deactivation
+            if executable.find('virtualenv_{}'.format(context)) != -1:
+                activate = os.sep.join([os.path.dirname(executable), 'activate'])
+                deactivate = os.sep.join([os.path.dirname(executable), 'deactivate'])
+                args.insert(0, activate)
+                args.insert(1, '&&')
+                args.append(deactivate)
+
+            print('xxxxx')
+            print(' '.join(args))
+            print('xxxxx')
+
             print('')
             print('/'*80)
             status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
@@ -228,6 +240,7 @@ def runTestSuite(settings, report=True):
             _recoverStatsFromReturnCode(settings, proc.returncode)
 
         except Exception as e:
+            traceback.print_exc()
             raise(e)
         finally:
             _clearSettingsInEnv()
@@ -447,7 +460,19 @@ def _getExecutable(settings):
     """
     context = settings['context']
     context_details = settings['context_details'][context]
-    return context_details['executable']
+    executable = context_details['executable']
+
+    # if this is standalone python then prefer the correct virtualenv
+    if context.lower().find('python') != -1:
+        dcc_settings = _createTestRootFolder(settings,
+                                             name='_dcc_settings',
+                                             reuse_existing=True)
+        # dcc_settings = _getWrapperPath(settings, explicit_name="_dcc_settings")
+        venv_root = os.sep.join([dcc_settings, 'virtualenv_{}'.format(context)])
+        if os.path.exists(venv_root):
+            # activate = os.sep.join([venv_root, 'Scripts', 'activate'])
+            executable = os.sep.join([venv_root, 'Scripts', 'python'])
+    return executable
 
 # -----------------------------------------------------------------------------
 def _getPathToMyself():
@@ -458,7 +483,7 @@ def _getPathToMyself():
     path_tokens[-1] = 'py'
     path_to_myself = '.'.join(path_tokens)
 
-    return path_to_myself
+    return os.path.abspath(path_to_myself)
 
 # -----------------------------------------------------------------------------
 def _getWrapperPath(settings, explicit_name=None):

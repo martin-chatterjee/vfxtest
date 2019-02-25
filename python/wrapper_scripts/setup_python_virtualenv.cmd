@@ -9,6 +9,7 @@ set VENV_ROOT=%3
 set VFXTEST_ROOT=%4
 
 cd %VENV_ROOT%
+%PYTHON% -m pip install virtualenv
 %PYTHON% -m virtualenv %VENV_NAME%
 CALL %VENV_NAME%\Scripts\activate.bat
 echo pip install -r %VFXTEST_ROOT%\..\requirements.txt

@@ -27,10 +27,11 @@ class TestCase04(vfxtest.TestCase):
         self.assertTrue(os.path.exists(tr))
         # retrieve settings in here
         current_context = self.context
-        print('    [TestCase04]  current context: {}'.format(current_context))
+        print('    [TestCase04]  current context:          {}'.format(current_context))
         executable = self.context_settings.get('executable', None)
-        print('    [TestCase04]  executable:      {}'.format(executable))
-        print('    [TestCase04]  test_root:       {}'.format(self.test_root))
+        print('    [TestCase04]  settings executable:      {}'.format(executable))
+        print('    [TestCase03]  real executable:          {}'.format(sys.executable))
+        print('    [TestCase04]  test_root:                {}'.format(self.test_root))
 
         foo = awesome_module.maya_internal(3, 5)
         self.assertEqual(foo, 8)
