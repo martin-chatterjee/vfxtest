@@ -18,3 +18,7 @@ def buzz(a, b):
 def lorem(a, b):
     return (a + b)
 
+def maya_internal(a, b):
+    import pymel.core as pm
+    return (a + b)
+

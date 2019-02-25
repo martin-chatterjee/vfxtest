@@ -74,7 +74,7 @@ class TestCaseTestCase(unittest.TestCase):
         self.assertEqual(foo.context_settings, settings['context_details']['python3.x'])
 
     # -------------------------------------------------------------------------
-    def test06_TextTestRunner__createTestRootFolder_invalid_test_output_raises_OSError(self):
+    def test06__createTestRootFolder_invalid_test_output_raises_OSError(self):
 
         invalid_test_output = os.path.abspath('./does/not/exist')
         self.assertFalse(os.path.exists(invalid_test_output))
@@ -84,7 +84,7 @@ class TestCaseTestCase(unittest.TestCase):
         settings['test_output'] = invalid_test_output
 
         with self.assertRaises(OSError):
-            runner._createTestRootFolder(settings=settings, test_case=None)
+            vfxtest._createTestRootFolder(settings=settings, name=['invalid'])
 
     # -------------------------------------------------------------------------
     def test07_test_root_sets_and_gets_class_variable(self):

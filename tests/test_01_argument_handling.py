@@ -78,7 +78,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         result_b = vfxtest.collectSettings(['-t', './subfolder',
                                        '-f', 'False',
-                                       '-p', './other.cfg',
+                                       '-c', './other.cfg',
                                        '-l', '13',
                                        'foo', 'bar', 'baz'])
 
@@ -148,7 +148,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                                           os.sep,
                                                           'vfxtest.cfg'))
         os.chdir('..')
-        os.rmdir('./test_output')
+
     # -------------------------------------------------------------------------
     def test10_collectSettings_settings_in_environment_get_recovered(self):
 

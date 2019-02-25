@@ -15,6 +15,7 @@ def main(folder_path, failfast, print_to_stdout, include_test_files):
     """
     """
     sys.path.append(os.path.abspath('./test_sandbox'))
+    os.environ['PYTHONPATH'] = os.path.abspath('./test_sandbox')
 
     omit = []
     if not include_test_files:

@@ -21,7 +21,10 @@ import unittest
 try: # pragma: no cover
     import unittest.mock as mock
 except: # pragma: no cover
-    import mock
+    try:
+        import mock
+    except:
+        pass
 
 import coverage
 import colorama
@@ -108,6 +111,20 @@ def collectSettings(args=[]):
 
 
 # -----------------------------------------------------------------------------
+def initContext(settings):
+    """
+    """
+    try:
+
+        if settings['context'] == 'mayapy':
+            import maya.standalone
+            maya.standalone.initialize()
+
+    except Exception as e:
+        print("initContext(): {}".format(e))
+        traceback.print_exc()
+
+# -----------------------------------------------------------------------------
 def runTestSuite(settings, report=True):
     """Runs the test suite found inside the 'target' folder specified in
     'settings'.
@@ -143,10 +160,15 @@ def runTestSuite(settings, report=True):
             wrapper = _getWrapperPath(ctxt_settings)
             executable = _getExecutable(ctxt_settings)
             path_to_myself = _getPathToMyself()
+            dcc_settings_root = _createTestRootFolder(settings,
+                                                      name='_dcc_settings',
+                                                      reuse_existing=True)
+            _ensureVirtualEnvs(settings, dcc_settings_root)
 
             args = [wrapper,
                     executable,
                     path_to_myself,
+                    dcc_settings_root,
                     str(settings['debug_mode'])]
 
             print('')
@@ -168,8 +190,12 @@ def runTestSuite(settings, report=True):
                 print('      ' + ctxt_settings['target'])
                 print('')
                 print('[DBG] target context:')
-                print('      -------------')
+                print('      --------------')
                 print('      ' + ctxt_settings['context'])
+                print('')
+                print('[DBG] dcc settings root:')
+                print('      -----------------')
+                print('      ' + dcc_settings_root)
                 print('')
                 print('')
 
@@ -257,6 +283,8 @@ def runNative(settings, report=True, use_coverage=True):
         (Exception)         : any internal exception will be re-raised
 
     """
+    initContext(settings)
+
     if use_coverage:
         cov = _startCoverage(settings)
 
@@ -321,7 +349,7 @@ def resolveContext(settings):
         (string)            :  resolved context
 
     """
-    context = os.path.basename(settings['target'])
+    context = os.path.basename(os.path.abspath(settings['target']))
     if not context in settings['context_details']:
         context = 'native'
     return context
@@ -337,7 +365,7 @@ def _defineArguments():
                         help='target folder path (defaults to current working directory)')
     parser.add_argument('-f', '--failfast', type=__stringToBool, default=True,
                         help='Stops execution of test suite on first error.')
-    parser.add_argument('-p', '--cfg', metavar='', type=str, default=None,
+    parser.add_argument('-c', '--cfg', metavar='', type=str, default=None,
                         help="path of the .cfg file to use. "
                              ""
                              "Defaults to 'vfxtest.cfg' in:"
@@ -433,15 +461,16 @@ def _getPathToMyself():
     return path_to_myself
 
 # -----------------------------------------------------------------------------
-def _getWrapperPath(settings):
+def _getWrapperPath(settings, explicit_name=None):
     """
     """
     # use bash for every os execpt Windows
     suffix = '.sh'
     if platform.system() == 'Windows':
         suffix = '.cmd'
-
-    wrapper_name = '{}{}'.format(settings['context'], suffix)
+    if explicit_name is None:
+        explicit_name = settings['context']
+    wrapper_name = '{}{}'.format(explicit_name, suffix)
     wrapper_path = '{}{}{}'.format(settings['wrapper_scripts'],
                                    os.sep,
                                    wrapper_name)
@@ -458,6 +487,14 @@ def _startCoverage(settings):
     omit = []
     # omit myself
     omit.append('*vfxtest.py')
+    # omit everythin in 'test_output'
+    omit.append('{}/*'.format(settings['test_output']))
+    # add omit_coverage tokens from config
+    context = settings['context']
+    context_details = settings.get('context_details', {}).get(context, {})
+    omit_coverage = context_details.get('omit_coverage', [])
+    if isinstance(omit_coverage, list) or isinstance(omit_coverage, tuple):
+        omit.extend(omit_coverage)
     # omit all test files
     if not settings['include_test_files']:
         # prepare test file pattern
@@ -514,16 +551,15 @@ def _getSettings(arg_parser, args):
     try:
         # start with arguments
         settings = vars(arg_parser.parse_args(args=args))
-
         # use settings in environment if present, fall back to cfg file
         if 'vfxtest_settings' in os.environ:
             _recoverSettingsFromEnv(settings)
         else:
             _readConfig(settings)
 
-        # make all paths absolute
-        for key in ['cfg', 'target', 'test_output']:
-            settings[key] = os.path.abspath(settings[key])
+        # # make all paths absolute
+        # for key in ['cfg', 'target', 'test_output']:
+        #     settings[key] = os.path.abspath(settings[key])
 
         # create 'test_output' if needed, but never create it's parent folder
         test_output = settings['test_output']
@@ -614,6 +650,18 @@ def _readConfig(settings):
         settings['debug_mode'] = False
 
     settings['cwd'] = os.getcwd()
+
+    # make all paths absolute
+    for key in ['cfg', 'target']:
+        settings[key] = os.path.abspath(settings[key])
+    # make test_output absolute in relation to config location
+    stored_wd = os.getcwd()
+    try:
+        os.chdir(os.path.dirname(settings['cfg']))
+        settings['test_output'] = os.path.abspath(settings['test_output'])
+    finally:
+        os.chdir(stored_wd)
+
     settings['context'] = resolveContext(settings)
 
     settings['subprocess'] = False
@@ -671,6 +719,102 @@ def _printHighlighted(line):
                                colorama.Style.RESET_ALL)
     print(styled)
 
+# -------------------------------------------------------------------------
+def _createTestRootFolder(settings, name, reuse_existing=False):
+    """Creates a sandboxed test_root folder inside the 'test_output'
+    folder specified in 'settings'. The name of the test_root folder
+    will match the name of the TestCase.
+
+    If the test_root folder already exists, it will get deleted
+    and recreated.
+
+    However if 'test_output' does not exist it will raise an OSError.
+
+    Args:
+        settings (dict)      :  dictionary holding all our settings
+        name (string)        :  name of the test root folder to create.
+
+    Returns:
+        (string)        :  absolute path of test_root
+
+    Raises:
+        (OSError)       :  if 'test_output' does not exist
+
+    """
+    test_output = settings.get('test_output', None)
+    if not os.path.exists(test_output):
+        raise OSError("Invalid test_output: {}".format(test_output))
+
+    testsuite_root = '{}{}{}'.format(test_output,
+                                     os.sep,
+                                     name)
+    if os.path.exists(testsuite_root) and not reuse_existing:
+       shutil.rmtree(testsuite_root)
+    if not os.path.exists(testsuite_root):
+        os.makedirs(testsuite_root)
+
+    return testsuite_root
+
+# -----------------------------------------------------------------------------
+def _collectVirtualEnvDetails(settings, root_folder):
+    """
+    """
+    result = {}
+
+    for context in settings['context_details']:
+        if context.lower().find('python') != -1:
+            details = settings['context_details'][context]
+            executable = details.get('executable', '')
+            if os.path.exists(executable):
+                venv_name = 'virtualenv_{}'.format(context)
+                venv_path = '{}{}{}'.format(root_folder, os.sep, venv_name)
+                result[venv_path] = executable
+
+    return result
+
+# -----------------------------------------------------------------------------
+def _ensureVirtualEnvs(settings, root_folder):
+    """
+    """
+    virtualenvs = _collectVirtualEnvDetails(settings, root_folder)
+
+    for venv_path in virtualenvs:
+        if not os.path.exists(venv_path):
+            executable = virtualenvs[venv_path]
+            _initializeVirtualEnv(settings, venv_path, executable)
+
+# -----------------------------------------------------------------------------
+def _initializeVirtualEnv(settings, venv_path, executable):
+    """
+    """
+    venv_name = os.path.basename(venv_path)
+    venv_root = os.path.dirname(venv_path)
+    wrapper = _getWrapperPath(settings,
+                              explicit_name='setup_python_virtualenv')
+
+    args = [wrapper,
+            executable,
+            venv_name,
+            venv_root,
+            os.path.dirname(_getPathToMyself())]
+
+    proc = subprocess.Popen(args=args,
+                            bufsize=0,
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    print('')
+    print('/'*80)
+    print("Initializing virtualenv '{}'".format(venv_name))
+    sys.stdout.flush()
+    while True:
+        line = proc.stdout.readline().decode('utf-8')
+        if not line:
+            break
+        sys.stdout.write(line)
+    proc.wait()
+    print('/'*80)
+    print('')
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):
@@ -745,42 +889,6 @@ class TextTestRunner(unittest.TextTestRunner):
         return super(TextTestRunner, self).run(test, *args, **kwargs)
 
     # -------------------------------------------------------------------------
-    def _createTestRootFolder(self, settings, test_case):
-        """Creates a sandboxed test_root folder inside the 'test_output'
-        folder specified in 'settings'. The name of the test_root folder
-        will match the name of the TestCase.
-
-        If the test_root folder already exists, it will get deleted
-        and recreated.
-
-        However if 'test_output' does not exist it will raise an OSError.
-
-        Args:
-            settings (dict)      :  dictionary holding all our settings
-            test_case (TestCase) :  TestCase for which to create the test_root
-                                    folder.
-                                    (default: True)
-
-        Returns:
-            (string)        :  absolute path of test_root
-
-        Raises:
-            (OSError)       :  if 'test_output' does not exist
-
-        """
-        test_output = settings.get('test_output', None)
-        if not os.path.exists(test_output):
-            raise OSError("Invalid test_output: {}".format(test_output))
-
-        testsuite_root = '{}{}{}'.format(test_output,
-                                         os.sep,
-                                         test_case.__class__.__name__)
-        if os.path.exists(testsuite_root):
-           shutil.rmtree(testsuite_root)
-        os.makedirs(testsuite_root)
-        return testsuite_root
-
-    # -------------------------------------------------------------------------
     def _prepTestCases(self, test, settings):
         """
         """
@@ -795,7 +903,9 @@ class TextTestRunner(unittest.TextTestRunner):
                     for bc in base_classes:
                         if str(bc) == "<class 'vfxtest.TestCase'>":
                             item.settings = settings
-                            item.test_root = self._createTestRootFolder(settings, item)
+                            test_case_name = item.__class__.__name__
+                            item.test_root = _createTestRootFolder(settings,
+                                                                   test_case_name)
                             return
                 elif isinstance(item, unittest.TestSuite):
                     self._prepTestCases(item, settings)

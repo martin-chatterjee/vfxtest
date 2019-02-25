@@ -18,6 +18,12 @@ IF "%DEBUG_MODE%"=="True" (
     echo.
 )
 
+set MAYA_APP_DIR=%SETTINGS_ROOT%/mayapy.vfxtest
+set MAYA_SCRIPT_PATH=%~dp0
+set PYTHONPATH=%~dp0;%SETTINGS_ROOT%\virtualenv_python2.x\Lib\site-packages;%PYTHONPATH%
+set MAYA_PLUG_IN_PATH=
+set MAYA_MODULE_PATH=
+
 %COMMAND%
 
 endlocal

@@ -5,10 +5,15 @@
 
 import unittest
 import os
+import sys
 import json
+# try:
+#     import unittest.mock as mock
+# except ImportError:
+#     import mock
 
 import vfxtest
-
+mock = vfxtest.mock
 
 # -----------------------------------------------------------------------------
 class RunMainTestCase(unittest.TestCase):
@@ -76,9 +81,27 @@ class RunMainTestCase(unittest.TestCase):
 
         proof = vfxtest.collectSettings()
         vfxtest._recoverStatsFromReturnCode(proof, returnvalue)
-        self.assertEqual(proof['count_files_run'], 4)
-        self.assertEqual(proof['count_tests_run'], 12)
+        self.assertEqual(proof['count_files_run'], 5)
+        self.assertEqual(proof['count_tests_run'], 15)
         self.assertEqual(proof['count_errors'], 0)
+
+    # -------------------------------------------------------------------------
+    def test05_initContext_recognizes_and_initializes_mayapy_session(self):
+
+        settings = vfxtest.collectSettings()
+        settings['context'] = 'mayapy'
+
+        with mock.patch.dict(sys.modules, {'maya': mock.Mock()}):
+            with mock.patch.dict(sys.modules, {'maya.standalone': mock.Mock()}):
+                vfxtest.initContext(settings)
+
+    # -------------------------------------------------------------------------
+    def test06_initContext_logs_ands_swallows_any_exception(self):
+
+        settings = vfxtest.collectSettings()
+        settings['context'] = 'mayapy'
+
+        vfxtest.initContext(settings)
 
 
 # -----------------------------------------------------------------------------

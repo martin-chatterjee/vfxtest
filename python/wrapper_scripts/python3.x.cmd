@@ -3,7 +3,8 @@ setlocal
 
 set EXECUTABLE=%1
 set VFXTEST=%2
-set DEBUG_MODE=%3
+set SETTINGS_ROOT=%3
+set DEBUG_MODE=%4
 
 set COMMAND=%EXECUTABLE% %VFXTEST%
 
