@@ -22,3 +22,7 @@ def maya_internal(a, b):
     import pymel.core as pm
     return (a + b)
 
+def hou_internal(a, b):
+    import hou
+    return (a + b)
+

@@ -8,6 +8,7 @@ import os
 import json
 
 import vfxtest
+mock = vfxtest.mock
 
 
 # -----------------------------------------------------------------------------
@@ -42,9 +43,9 @@ class RunTestSuiteTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings()
         vfxtest.runTestSuite(settings=settings)
 
-        self.assertEqual(settings['count_files_run'], 2)
-        self.assertEqual(settings['count_tests_run'], 6)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 2)
+        self.assertEqual(settings['tests_run'], 6)
+        self.assertEqual(settings['errors'], 0)
 
     # -------------------------------------------------------------------------
     def test02_runTestSuite_single_context_runs_successfully(self):
@@ -59,9 +60,9 @@ class RunTestSuiteTestCase(unittest.TestCase):
         settings['debug_mode'] = True
 
         vfxtest.runTestSuite(settings=settings)
-        self.assertEqual(settings['count_files_run'], 2)
-        self.assertEqual(settings['count_tests_run'], 6)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 2)
+        self.assertEqual(settings['tests_run'], 6)
+        self.assertEqual(settings['errors'], 0)
         self.assertTrue(os.path.exists(cov_file))
 
     # -------------------------------------------------------------------------
@@ -80,9 +81,9 @@ class RunTestSuiteTestCase(unittest.TestCase):
 
         vfxtest.runTestSuite(settings=settings)
 
-        self.assertEqual(settings['count_files_run'], 4)
-        self.assertEqual(settings['count_tests_run'], 12)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 4)
+        self.assertEqual(settings['tests_run'], 12)
+        self.assertEqual(settings['errors'], 0)
         self.assertTrue(os.path.exists(cov_file_3))
         self.assertTrue(os.path.exists(cov_file_2))
 
@@ -97,74 +98,16 @@ class RunTestSuiteTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test05_encodeStatsIntoReturnCode_works_as_expected(self):
+    def test05_runTestSuite_raises_SystemExit_on_child_proc_exit_code_bigger_than_zero(self):
 
-        empty = {}
-        empty['count_files_run'] = 0
-        empty['count_tests_run'] = 0
-        empty['count_errors'] = 0
-        settings = empty.copy()
-        settings['count_files_run'] = 13
-        settings['count_tests_run'] = 26
-        settings['count_errors'] = 39
+        settings = vfxtest.collectSettings()
 
-        exitcode = vfxtest._encodeStatsIntoReturnCode(settings)
+        settings['context'] = 'python3.x'
+        settings['debug_mode'] = True
 
-        proof = empty.copy()
-        vfxtest._recoverStatsFromReturnCode(proof, exitcode)
-        self.assertEqual(settings, proof)
-
-        settings['count_files_run'] = 0
-        settings['count_tests_run'] = 0
-        settings['count_errors'] = 0
-
-        exitcode = vfxtest._encodeStatsIntoReturnCode(settings)
-
-        proof = empty.copy()
-        vfxtest._recoverStatsFromReturnCode(proof, exitcode)
-        self.assertEqual(settings, proof)
-
-        settings['count_files_run'] = 999
-        settings['count_tests_run'] = 998
-        settings['count_errors'] = 997
-
-        exitcode = vfxtest._encodeStatsIntoReturnCode(settings)
-
-        proof = empty.copy()
-        vfxtest._recoverStatsFromReturnCode(proof, exitcode)
-        self.assertEqual(settings, proof)
-
-    # -------------------------------------------------------------------------
-    def test06_encodeStatsIntoReturnCode_caps_illegal_stats_to_range_0_to_999(self):
-
-        empty = {}
-        empty['count_files_run'] = 0
-        empty['count_tests_run'] = 0
-        empty['count_errors'] = 0
-        settings = empty.copy()
-        settings['count_files_run'] = 1000
-        settings['count_tests_run'] = 999
-        settings['count_errors'] = 202020
-
-        exitcode = vfxtest._encodeStatsIntoReturnCode(settings)
-
-        proof = empty.copy()
-        vfxtest._recoverStatsFromReturnCode(proof, exitcode)
-        self.assertEqual(proof['count_files_run'], 999)
-        self.assertEqual(proof['count_tests_run'], 999)
-        self.assertEqual(proof['count_errors'], 999)
-
-        settings['count_files_run'] = -13
-        settings['count_tests_run'] = -26
-        settings['count_errors'] = -27
-
-        exitcode = vfxtest._encodeStatsIntoReturnCode(settings)
-
-        proof = empty.copy()
-        vfxtest._recoverStatsFromReturnCode(proof, exitcode)
-        self.assertEqual(proof['count_files_run'], 0)
-        self.assertEqual(proof['count_tests_run'], 0)
-        self.assertEqual(proof['count_errors'], 0)
+        with self.assertRaises(SystemExit):
+            with mock.patch('subprocess.Popen.wait', return_value=13):
+                vfxtest.runTestSuite(settings=settings)
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':

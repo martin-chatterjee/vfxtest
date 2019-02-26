@@ -38,8 +38,6 @@ class RunNativeTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test01_runNative_runs_successfully(self):
 
-        # if 'vfxtest_settings' in os.environ:
-        #     os.environ.pop('vfxtest_settings')
         settings = vfxtest.collectSettings()
 
         cov_file = os.path.abspath('{}/.coverage.native'.format(settings['test_output']))
@@ -47,9 +45,9 @@ class RunNativeTestCase(unittest.TestCase):
             os.remove(cov_file)
         vfxtest.runNative(settings=settings, use_coverage=True)
 
-        self.assertEqual(settings['count_files_run'], 2)
-        self.assertEqual(settings['count_tests_run'], 6)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 2)
+        self.assertEqual(settings['tests_run'], 6)
+        self.assertEqual(settings['errors'], 0)
         self.assertTrue(os.path.exists(cov_file))
 
     # -------------------------------------------------------------------------
@@ -57,9 +55,9 @@ class RunNativeTestCase(unittest.TestCase):
 
         settings = vfxtest.collectSettings(['--target', '.', '_01',])
         vfxtest.runNative(settings=settings, use_coverage=False)
-        self.assertEqual(settings['count_files_run'], 1)
-        self.assertEqual(settings['count_tests_run'], 3)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 1)
+        self.assertEqual(settings['tests_run'], 3)
+        self.assertEqual(settings['errors'], 0)
 
     # -------------------------------------------------------------------------
     def test03_combineCoverages_works_as_expected(self):
@@ -67,8 +65,8 @@ class RunNativeTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings(['_02',])
         settings['context'] = 'differentContext'
         vfxtest.runNative(settings=settings)
-        self.assertEqual(settings['count_files_run'], 1)
-        self.assertEqual(settings['count_tests_run'], 3)
+        self.assertEqual(settings['files_run'], 1)
+        self.assertEqual(settings['tests_run'], 3)
         self.assertTrue(os.path.exists('{}/.coverage.differentContext'.format(settings['test_output'])))
 
         settings = vfxtest.collectSettings()
@@ -94,9 +92,9 @@ class RunNativeTestCase(unittest.TestCase):
 
         vfxtest.runNative(settings=settings, use_coverage=False)
 
-        self.assertEqual(settings['count_files_run'], 1)
-        self.assertEqual(settings['count_tests_run'], 3)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 1)
+        self.assertEqual(settings['tests_run'], 3)
+        self.assertEqual(settings['errors'], 0)
 
     # -------------------------------------------------------------------------
     def test07_runNative_in_subfolder_works_as_expected(self):
@@ -105,9 +103,9 @@ class RunNativeTestCase(unittest.TestCase):
 
         vfxtest.runNative(settings=settings)
 
-        self.assertEqual(settings['count_files_run'], 1)
-        self.assertEqual(settings['count_tests_run'], 3)
-        self.assertEqual(settings['count_errors'], 0)
+        self.assertEqual(settings['files_run'], 1)
+        self.assertEqual(settings['tests_run'], 3)
+        self.assertEqual(settings['errors'], 0)
 
 
 # -----------------------------------------------------------------------------

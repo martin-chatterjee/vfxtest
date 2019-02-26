@@ -92,9 +92,6 @@ class TestCaseTestCase(unittest.TestCase):
         a = vfxtest.TestCase(test_run=True)
         b = vfxtest.TestCase(test_run=True)
 
-        # self.assertEqual(a.test_root, None)
-        # self.assertEqual(a.test_root, b.test_root)
-
         a.test_root = './foo/bar'
         self.assertEqual(a.test_root, './foo/bar')
         self.assertEqual(a.test_root, b.test_root)
@@ -103,16 +100,6 @@ class TestCaseTestCase(unittest.TestCase):
         self.assertEqual(b.test_root, './fizz/buzz')
         self.assertEqual(a.test_root, b.test_root)
 
-    # # -------------------------------------------------------------------------
-    # def test06_createTestFolder_works_as_expected(self):
-
-    #     settings = vfxtest.collectSettings()
-    #     self.assertTrue(os.path.exists(settings['test_output']))
-    #     foo = vfxtest.TestCase(test_run=True)
-    #     foo.settings = settings
-
-    #     proof = foo.createTestFolder('MyName')
-    #     self.assertEqual(proof, '{}{}{}'.format(settings['test_output'], os.sep, 'MyName'))
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':

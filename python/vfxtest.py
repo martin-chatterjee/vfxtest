@@ -18,13 +18,11 @@ import sys
 import traceback
 import unittest
 
-try: # pragma: no cover
+try:
     import unittest.mock as mock
-except: # pragma: no cover
-    try:
-        import mock
-    except:
-        pass
+except: # pragma: no cover_3
+    import mock
+
 
 import coverage
 import colorama
@@ -82,9 +80,7 @@ def runMain(args=[]):
         runChildTestSuites(settings)
         combineCoverages(settings)
 
-    exit_status = _encodeStatsIntoReturnCode(settings)
-    return exit_status
-
+    return getStats(settings)
 
 # -----------------------------------------------------------------------------
 def collectSettings(args=[]):
@@ -125,6 +121,37 @@ def initContext(settings):
         traceback.print_exc()
 
 # -----------------------------------------------------------------------------
+def _resolvePopenClass():
+    """
+    """
+    Popen = subprocess.Popen
+    if not hasattr(Popen, '__enter__'):
+        Popen = PopenWithContextManager  # pragma: no cover_3
+    return Popen
+
+# -----------------------------------------------------------------------------
+class PopenWithContextManager(subprocess.Popen): # pragma: no cover_3
+    """
+    """
+
+    # -------------------------------------------------------------------------
+    def __enter__(self):
+        return self
+
+    # -------------------------------------------------------------------------
+    def __exit__(self, exc_type, value, traceback):
+        if self.stdout:
+            self.stdout.close()
+        if self.stderr:
+            self.stderr.close()
+        try:  # Flushing a BufferedWriter may raise an error
+            if self.stdin:
+                self.stdin.close()
+        finally:
+            # Wait for the process to terminate, to avoid zombies.
+            self.wait()
+
+# -----------------------------------------------------------------------------
 def runTestSuite(settings, report=True):
     """Runs the test suite found inside the 'target' folder specified in
     'settings'.
@@ -159,7 +186,7 @@ def runTestSuite(settings, report=True):
 
             wrapper = _getWrapperPath(ctxt_settings)
             executable = _getExecutable(ctxt_settings)
-            path_to_myself = _getPathToMyself()
+            vfxtest_root = os.path.dirname(_getPathToMyself())
             dcc_settings_root = _createTestRootFolder(settings,
                                                       name='_dcc_settings',
                                                       reuse_existing=True)
@@ -167,9 +194,14 @@ def runTestSuite(settings, report=True):
 
             args = [wrapper,
                     executable,
-                    path_to_myself,
+                    vfxtest_root,
                     dcc_settings_root,
                     str(settings['debug_mode'])]
+
+            # deal with target_wrapper
+            target_wrapper = _getTargetWrapper(ctxt_settings)
+            if os.path.exists(target_wrapper):
+                args.append(target_wrapper)
 
             # deal with virtualenv activation and deactivation
             if executable.find('virtualenv_{}'.format(context)) != -1:
@@ -177,12 +209,13 @@ def runTestSuite(settings, report=True):
                 deactivate = os.sep.join([os.path.dirname(executable), 'deactivate'])
                 args.insert(0, activate)
                 args.insert(1, '&&')
+                args.append('&&')
                 args.append(deactivate)
 
-            print('xxxxx')
-            print(' '.join(args))
-            print('xxxxx')
-
+            # print('*'*80)
+            # for item in args:
+            #     print(item)
+            # print('*'*80)
             print('')
             print('/'*80)
             status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
@@ -190,6 +223,7 @@ def runTestSuite(settings, report=True):
             status_line += '/'*(80-len(status_line))
             print (status_line)
             print('')
+            sys.stdout.flush()
 
             if settings['debug_mode']:
                 print('')
@@ -210,34 +244,39 @@ def runTestSuite(settings, report=True):
                 print('      ' + dcc_settings_root)
                 print('')
                 print('')
+                sys.stdout.flush()
 
-
-            proc = subprocess.Popen(args=args,
-                                    bufsize=0,
-                                    shell=True,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT)
-
-            sys.stdout.flush()
-            while True:
-                line = proc.stdout.readline().decode('utf-8')
-                if not line:
-                    break
-                sys.stdout.write(line)
-            proc.wait()
+            Popen = _resolvePopenClass()
+            with Popen(args=args,
+                       bufsize=0,
+                       shell=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT) as proc:
+                sys.stdout.flush()
+                while True:
+                    line = proc.stdout.readline().decode('utf-8')
+                    if not line:
+                        break
+                    if not _updateStatsFromStdout(settings, line):
+                        sys.stdout.write(line)
+                        sys.stdout.flush()
+                returncode = proc.wait()
 
             if settings['debug_mode']:
                 print('')
                 print('[DBG] --> Process Return Code: {}'
-                       .format(proc.returncode))
+                       .format(returncode))
                 print('')
+                print('')
+                print ('/'*80)
+                print('')
+                sys.stdout.flush()
 
-            print('')
-            print ('/'*80)
-            print('')
-            sys.stdout.flush()
-
-            _recoverStatsFromReturnCode(settings, proc.returncode)
+            # stop here on internal child process error
+            if returncode != 0:
+                print("vfxtest ERROR: '{}' returned with error code {}. Stopping here..."
+                       .format(settings['context'], returncode))
+                raise(SystemExit)
 
         except Exception as e:
             traceback.print_exc()
@@ -262,9 +301,17 @@ def runChildTestSuites(settings):
 
     """
     child_settings = settings.copy()
-
     target = child_settings['target']
-    for item in os.listdir(target):
+
+    # run child test suites in alphabetical order, but do 'Python' first
+    def sort_python_first(item):
+        if item.lower().startswith('python'):
+            return 0
+        return 1
+    children = sorted(os.listdir(target))
+    children = sorted(children, key=sort_python_first)
+
+    for item in children:
         if item in child_settings['context_details']:
             item_path = '{}{}{}'.format(target, os.sep, item)
             if os.path.isdir(item_path):
@@ -273,9 +320,9 @@ def runChildTestSuites(settings):
                 print(child_settings['context'])
                 runTestSuite(child_settings)
 
-    settings['count_files_run'] = child_settings['count_files_run']
-    settings['count_tests_run'] = child_settings['count_tests_run']
-    settings['count_errors'] = child_settings['count_errors']
+    settings['files_run'] = child_settings['files_run']
+    settings['tests_run'] = child_settings['tests_run']
+    settings['errors'] = child_settings['errors']
 
 
 # -----------------------------------------------------------------------------
@@ -308,20 +355,24 @@ def runNative(settings, report=True, use_coverage=True):
     # run tests file by file
     for item in suite:
         if (settings['limit'] > 0 and
-                settings['count_files_run'] >= settings['limit']):
+                settings['files_run'] >= settings['limit']):
             print('Reached file limit... Stopping here...')
             break
 
         result = runner.run(item, settings=settings)
+        sys.stdout.flush()
 
-        settings['count_files_run'] += 1
-        settings['count_tests_run'] += result.testsRun
-        settings['count_errors'] += len(result.errors) + len(result.failures)
+        settings['files_run'] += 1
+        settings['tests_run'] += result.testsRun
+        settings['errors'] += len(result.errors) + len(result.failures)
 
     if use_coverage:
         # --> can't be covered:
         #     coverage does not work inside of another coverage run
         _stopCoverage(settings, cov, report=report) # pragma: no cover
+
+    if settings['context'] != 'native':
+        encodeStatsIntoStdout(settings)
 
 
 # -----------------------------------------------------------------------------
@@ -346,6 +397,35 @@ def combineCoverages(settings):
     except coverage.misc.CoverageException as e:
         print('Coverage: no data to report')
 
+
+# -----------------------------------------------------------------------------
+def getStats(settings):
+    """
+    """
+    stats = {}
+    stats['files_run'] = settings.get('files_run', 0)
+    stats['tests_run'] = settings.get('tests_run', 0)
+    stats['errors'] = settings.get('errors', 0)
+
+    return stats
+
+# -----------------------------------------------------------------------------
+def encodeStatsIntoStdout(settings):
+    """
+    """
+    stats = getStats(settings)
+    encoded = '<vfxtest-stats>{}</vfxtest-stats>'.format(json.dumps(stats))
+
+    stdout = sys.stdout
+    # let Maya print the stats to the _external_ stdout
+    # (console, not script editor)
+    if settings['context'].lower() == 'maya':
+        stdout = sys.__stdout__ # pragma: no cover
+
+    stdout.write('')
+    stdout.write(encoded)
+    stdout.write('')
+    stdout.flush()
 
 # -----------------------------------------------------------------------------
 def resolveContext(settings):
@@ -391,42 +471,37 @@ def _defineArguments():
 
     return parser
 
-
 # -----------------------------------------------------------------------------
-def _encodeStatsIntoReturnCode(settings):
+def _updateStatsFromStdout(settings, line):
     """
     """
-    # cap all count stats into range 0 - 999
-    for item in ['count_files_run', 'count_tests_run', 'count_errors']:
-        if settings[item] > 999:
-            print("Warning: '{}' run was {} - capping to 999"
-                   .format(item, settings[item]))
-            settings[item] = 999
-        elif settings[item] < 0:
-            print("Warning: '{}' run was {} - capping to 0"
-                   .format(item, settings[item]))
-            settings[item] = 0
+    status = False
 
-    result = 0
-    result += (settings['count_files_run'] * 1000000)
-    result += (settings['count_tests_run'] * 1000)
-    result += (settings['count_errors'] * 1)
+    try:
+        tokens = line.split('<vfxtest-stats>')
+        stats = tokens[1].split('</vfxtest-stats>')[0]
+        decoded = json.loads(stats)
 
-    return result
+        settings['files_run'] = decoded['files_run']
+        settings['tests_run'] = decoded['tests_run']
+        settings['errors'] = decoded['errors']
 
-# -----------------------------------------------------------------------------
-def _recoverStatsFromReturnCode(settings, returncode):
-    """
-    """
-    count_files_run = returncode // 1000000
-    returncode -= (count_files_run * 1000000)
-    count_tests_run = returncode // 1000
-    returncode -= (count_tests_run * 1000)
-    count_errors = returncode
+        print('')
+        print('Updated Stats -------------------------')
+        print(' {} test files run'.format(settings['files_run']))
+        print(' {} tests run'.format(settings['tests_run']))
+        print(' {} errors'.format(settings['errors']))
+        print('---------------------------------------')
+        print('')
+        sys.stdout.flush()
 
-    settings['count_files_run'] = count_files_run
-    settings['count_tests_run'] = count_tests_run
-    settings['count_errors'] = count_errors
+        status = True
+
+    except (IndexError, TypeError) as e:
+        pass
+
+    return status
+
 
 # -----------------------------------------------------------------------------
 def _storeSettingsInEnv(settings):
@@ -467,10 +542,8 @@ def _getExecutable(settings):
         dcc_settings = _createTestRootFolder(settings,
                                              name='_dcc_settings',
                                              reuse_existing=True)
-        # dcc_settings = _getWrapperPath(settings, explicit_name="_dcc_settings")
         venv_root = os.sep.join([dcc_settings, 'virtualenv_{}'.format(context)])
         if os.path.exists(venv_root):
-            # activate = os.sep.join([venv_root, 'Scripts', 'activate'])
             executable = os.sep.join([venv_root, 'Scripts', 'python'])
     return executable
 
@@ -486,16 +559,30 @@ def _getPathToMyself():
     return os.path.abspath(path_to_myself)
 
 # -----------------------------------------------------------------------------
-def _getWrapperPath(settings, explicit_name=None):
+def _getTargetWrapper(settings):
+    """
+    """
+    context = settings['context']
+    context_details = settings['context_details'][context]
+    target_wrapper = context_details.get('target_wrapper', '')
+    if target_wrapper != '':
+        target_wrapper = _getWrapperPath(settings,
+                                         name=target_wrapper,
+                                         suffix='')
+    return target_wrapper
+
+# -----------------------------------------------------------------------------
+def _getWrapperPath(settings, name=None, suffix=None):
     """
     """
     # use bash for every os execpt Windows
-    suffix = '.sh'
-    if platform.system() == 'Windows':
-        suffix = '.cmd'
-    if explicit_name is None:
-        explicit_name = settings['context']
-    wrapper_name = '{}{}'.format(explicit_name, suffix)
+    if suffix is None:
+        suffix = '.sh'
+        if platform.system() == 'Windows':
+            suffix = '.cmd'
+    if name is None:
+        name = settings['context']
+    wrapper_name = '{}{}'.format(name, suffix)
     wrapper_path = '{}{}{}'.format(settings['wrapper_scripts'],
                                    os.sep,
                                    wrapper_name)
@@ -659,12 +746,12 @@ def _readConfig(settings):
                             .format(os.path.dirname(__file__), os.sep))
         settings['wrapper_scripts'] = wrapper_scripts
 
-    if not 'count_files_run' in settings:
-        settings['count_files_run'] = 0
-    if not 'count_tests_run' in settings:
-        settings['count_tests_run'] = 0
-    if not 'count_errors' in settings:
-        settings['count_errors'] = 0
+    if not 'files_run' in settings:
+        settings['files_run'] = 0
+    if not 'tests_run' in settings:
+        settings['tests_run'] = 0
+    if not 'errors' in settings:
+        settings['errors'] = 0
 
     if not 'debug_mode' in settings:
         settings['debug_mode'] = False
@@ -815,7 +902,7 @@ def _initializeVirtualEnv(settings, venv_path, executable):
     venv_name = os.path.basename(venv_path)
     venv_root = os.path.dirname(venv_path)
     wrapper = _getWrapperPath(settings,
-                              explicit_name='setup_python_virtualenv')
+                              name='setup_python_virtualenv')
 
     args = [wrapper,
             executable,
@@ -823,23 +910,24 @@ def _initializeVirtualEnv(settings, venv_path, executable):
             venv_root,
             os.path.dirname(_getPathToMyself())]
 
-    proc = subprocess.Popen(args=args,
-                            bufsize=0,
-                            shell=True,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    print('')
-    print('/'*80)
-    print("Initializing virtualenv '{}'".format(venv_name))
-    sys.stdout.flush()
-    while True:
-        line = proc.stdout.readline().decode('utf-8')
-        if not line:
-            break
-        sys.stdout.write(line)
-    proc.wait()
-    print('/'*80)
-    print('')
+    Popen = _resolvePopenClass()
+    with Popen(args=args,
+               bufsize=0,
+               shell=True,
+               stdout=subprocess.PIPE,
+               stderr=subprocess.STDOUT) as proc:
+        print('')
+        print('/'*80)
+        print("Initializing virtualenv '{}'".format(venv_name))
+        sys.stdout.flush()
+        while True:
+            line = proc.stdout.readline().decode('utf-8')
+            if not line:
+                break
+            sys.stdout.write(line)
+        proc.wait()
+        print('/'*80)
+        print('')
 
 # -----------------------------------------------------------------------------
 def __stringToBool(value):
@@ -1003,5 +1091,5 @@ class TestCase(unittest.TestCase):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    sys.exit(runMain(sys.argv[1:])) # pragma: no cover
+    runMain(sys.argv[1:]) # pragma: no cover
 

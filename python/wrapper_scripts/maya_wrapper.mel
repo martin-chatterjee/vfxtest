@@ -1,0 +1,5 @@
+
+global proc DoIt()  {
+    string $sPython = "import maya_wrapper_delayed as mwd; mwd.scheduleDelayed()";
+    evalDeferred `python $sPython`;
+}

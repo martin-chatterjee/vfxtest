@@ -5,6 +5,7 @@
 
 import os
 import sys
+import platform
 import glob
 import unittest
 
@@ -20,8 +21,16 @@ def main(folder_path, failfast, print_to_stdout, include_test_files):
     omit = []
     if not include_test_files:
         omit.append('test*.py')
-
+    # add support for Python major version 'no-cover' support:
+    # --> no coverage on python 2.x:
+    #                                # pragma: no cover_2
+    # --> no coverage on python 3.x:
+    #                                # pragma: no cover_3
     cov = coverage.Coverage(omit=omit)
+    major = platform.python_version_tuple()[0]
+    versioned_exclude = (r'#\s*(pragma|PRAGMA)[:\s]?\s*'
+                         r'(no|NO)\s*(cover_{}|COVER_{})').format(major, major)
+    cov.exclude(versioned_exclude, which='exclude')
     cov.start()
 
     # discover all tests and run them

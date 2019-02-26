@@ -5,8 +5,9 @@ set EXECUTABLE=%1
 set VFXTEST_ROOT=%2
 set SETTINGS_ROOT=%3
 set DEBUG_MODE=%4
+set TARGET_WRAPPER=%5
 
-set COMMAND=%EXECUTABLE% %VFXTEST_ROOT%\vfxtest.py
+set COMMAND=%EXECUTABLE% %TARGET_WRAPPER%
 
 IF "%DEBUG_MODE%"=="True" (
     echo.
@@ -18,11 +19,9 @@ IF "%DEBUG_MODE%"=="True" (
     echo.
 )
 
-set MAYA_APP_DIR=%SETTINGS_ROOT%/mayapy.vfxtest
-set MAYA_SCRIPT_PATH=%~dp0
-set PYTHONPATH=%~dp0;%SETTINGS_ROOT%\virtualenv_python2.x\Lib\site-packages;%PYTHONPATH%
-set MAYA_PLUG_IN_PATH=
-set MAYA_MODULE_PATH=
+set HOUDINI_USER_PREF_DIR=%SETTINGS_ROOT%/houdini.vfxtest.__HVER__
+set HSITE=
+set PYTHONPATH=%~dp0;%VFXTEST_ROOT%;%SETTINGS_ROOT%\virtualenv_python2.x\Lib\site-packages;%PYTHONPATH%
 
 %COMMAND%
 
