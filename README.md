@@ -1,6 +1,6 @@
 # vfxtest
 
-[<p align="center">**How do I use this?**</p>](./docs/USAGE.md)
+[<p align="center">**How do I use this?**</p>](./USAGE.md)
 
 
 ## What's this about?
