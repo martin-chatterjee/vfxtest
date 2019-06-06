@@ -46,7 +46,8 @@ this need and did not find an obvious existing solution to it.
 <br><br>
 
 ## 'Impostor Syndrome' Disclaimer
-I'm really still in my first inning of the whole TDD game.\
+I'm really still in my first inning of the whole TDD game.
+
 Therefore I'm fully aware that I probably know barely enough to be dangerous
 right now. :)
 

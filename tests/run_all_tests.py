@@ -15,8 +15,11 @@ import coverage
 def main(folder_path, failfast, print_to_stdout, include_test_files):
     """
     """
-    sys.path.append(os.path.abspath('./test_sandbox'))
-    os.environ['PYTHONPATH'] = os.path.abspath('./test_sandbox')
+    test_sandbox = os.path.abspath('./test_sandbox')
+    python = os.path.abspath('../python')
+    sys.path.append(test_sandbox)
+    sys.path.append(python)
+    os.environ['PYTHONPATH'] = os.pathsep.join([test_sandbox, python])
 
     omit = []
     if not include_test_files:

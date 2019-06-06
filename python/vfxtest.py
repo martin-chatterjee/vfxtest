@@ -4,36 +4,9 @@
 # Licensed under MIT License (--> LICENSE.txt)
 # -----------------------------------------------------------------------------
 
-import argparse
-import copy
-from fnmatch import fnmatch
-import glob
-import inspect
-import json
-import os
-import platform
-import subprocess
-import shutil
-import sys
-import traceback
-import unittest
-
-try:
-    import unittest.mock as mock
-except: # pragma: no cover_3
-    import mock
-
-
-import coverage
-import colorama
-
-colorama.init()
-main = unittest.main
-
-
 """'vfxtest' is a thin wrapper around unittest, coverage and mock.
 
-It's purpose is to manage and run multiple test suites testing a python
+Its purpose is to manage and run multiple test suites against a python
 codebase that gets used inside multiple different contexts commonly found
 in a VFX production environment.
 
@@ -50,15 +23,40 @@ provides you with combined code coverage metrics for all of them.
 
 """
 
+import argparse
+import copy
+from fnmatch import fnmatch
+import glob
+import inspect
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import traceback
+import unittest
+
+try:
+    import unittest.mock as mock
+except: # pragma: no cover_3
+    import mock
+
+import coverage
+import colorama
+
+colorama.init()
+main = unittest.main
+
 
 # -----------------------------------------------------------------------------
 def runMain(args=[]):
-    """Main function that gets executed when 'vfxtest' gets run.
+    """Main function that gets executed when ``vfxtest`` gets run.
 
-    Collects and validates 'settings' from both the passed in arguments as
+    Collects and validates **settings** from both the passed in arguments as
     well as the config file.
     Then runs the test suite found directly in the 'target' folder specified
-    in 'settings', followee by all other test suites found in subfolders of
+    in 'settings', followed by all other test suites found in subfolders of
     'target'.
     Finally combines all coverage reports into one, and reports it both to
     STDOUT and to HTML.
@@ -82,6 +80,7 @@ def runMain(args=[]):
 
     return getStats(settings)
 
+
 # -----------------------------------------------------------------------------
 def collectSettings(args=[]):
     """Collects and validates 'settings' from both the passed in arguments
@@ -96,60 +95,12 @@ def collectSettings(args=[]):
     Raises:
         (SystemExit)    :   on missing or incompatible settings or arguments
 
-
     """
-    # define arguments
     arg_parser = _defineArguments()
-    # validate preferences and add to settings
     settings = _getSettings(arg_parser, args)
 
     return settings
 
-
-# -----------------------------------------------------------------------------
-def initContext(settings):
-    """
-    """
-    try:
-
-        if settings['context'] == 'mayapy':
-            import maya.standalone
-            maya.standalone.initialize()
-
-    except Exception as e:
-        print("initContext(): {}".format(e))
-        traceback.print_exc()
-
-# -----------------------------------------------------------------------------
-def _resolvePopenClass():
-    """
-    """
-    Popen = subprocess.Popen
-    if not hasattr(Popen, '__enter__'):
-        Popen = PopenWithContextManager  # pragma: no cover_3
-    return Popen
-
-# -----------------------------------------------------------------------------
-class PopenWithContextManager(subprocess.Popen): # pragma: no cover_3
-    """
-    """
-
-    # -------------------------------------------------------------------------
-    def __enter__(self):
-        return self
-
-    # -------------------------------------------------------------------------
-    def __exit__(self, exc_type, value, traceback):
-        if self.stdout:
-            self.stdout.close()
-        if self.stderr:
-            self.stderr.close()
-        try:  # Flushing a BufferedWriter may raise an error
-            if self.stdin:
-                self.stdin.close()
-        finally:
-            # Wait for the process to terminate, to avoid zombies.
-            self.wait()
 
 # -----------------------------------------------------------------------------
 def runTestSuite(settings, report=True):
@@ -176,7 +127,6 @@ def runTestSuite(settings, report=True):
         return
 
     for context in _resolveContextsToRun(settings):
-
         try:
             # start with copy of settings, update context
             ctxt_settings = copy.deepcopy(settings)
@@ -212,10 +162,6 @@ def runTestSuite(settings, report=True):
                 args.append('&&')
                 args.append(deactivate)
 
-            # print('*'*80)
-            # for item in args:
-            #     print(item)
-            # print('*'*80)
             print('')
             print('/'*80)
             status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
@@ -399,19 +345,15 @@ def combineCoverages(settings):
 
 
 # -----------------------------------------------------------------------------
-def getStats(settings):
-    """
-    """
-    stats = {}
-    stats['files_run'] = settings.get('files_run', 0)
-    stats['tests_run'] = settings.get('tests_run', 0)
-    stats['errors'] = settings.get('errors', 0)
-
-    return stats
-
-# -----------------------------------------------------------------------------
 def encodeStatsIntoStdout(settings):
-    """
+    """Encode serialized stats into a parsable string and write that to STDOUT.
+
+    Using this mechanism we pass back the current stats to a potential parent
+    process.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
     """
     stats = getStats(settings)
     encoded = '<vfxtest-stats>{}</vfxtest-stats>'.format(json.dumps(stats))
@@ -426,6 +368,26 @@ def encodeStatsIntoStdout(settings):
     stdout.write(encoded)
     stdout.write('')
     stdout.flush()
+
+
+# -----------------------------------------------------------------------------
+def getStats(settings):
+    """Extract and return our stats from settings.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    Returns:
+        (dict)              : dictionary holding stats
+
+    """
+    stats = {}
+    stats['files_run'] = settings.get('files_run', 0)
+    stats['tests_run'] = settings.get('tests_run', 0)
+    stats['errors'] = settings.get('errors', 0)
+
+    return stats
+
 
 # -----------------------------------------------------------------------------
 def resolveContext(settings):
@@ -449,8 +411,32 @@ def resolveContext(settings):
 
 
 # -----------------------------------------------------------------------------
-def _defineArguments():
+def initContext(settings):
+    """Perform any context-specific inits.
+
+    Right now we are only dealing with 'mayapy' inits in here.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
     """
+    try:
+        if settings['context'] == 'mayapy':
+            import maya.standalone
+            maya.standalone.initialize()
+
+    except Exception as e:
+        print("initContext(): {}".format(e))
+        traceback.print_exc()
+
+
+# -----------------------------------------------------------------------------
+def _defineArguments():
+    """Defines and documents the valid command line arguments.
+
+    Returns:
+        (ArgumentParser)  : ArgumentParser object
+
     """
     parser = argparse.ArgumentParser(description='Run test suite(s):')
 
@@ -471,9 +457,43 @@ def _defineArguments():
 
     return parser
 
+
+# -----------------------------------------------------------------------------
+def __stringToBool(value):
+    """Attempts to interpret value as a boolean value.
+
+    Args:
+        value (string)               : string to interpret as a boolean
+
+    Returns:
+        (bool)                       : extracted boolean value
+
+    Raises:
+        (argparse.ArgumentTypeError) : If value could not be interpreted
+                                       as a boolean value
+
+    """
+    if value.lower() in ('true', '1', 'y', 'yes'):
+        return True
+    if value.lower() in ('false', '0', 'n', 'no'):
+        return False
+    raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 # -----------------------------------------------------------------------------
 def _updateStatsFromStdout(settings, line):
-    """
+    """Parses 'line' and tries to extract encoded 'vfxtest-stats' that the
+    subprocess might have logged.
+
+    If any 'vfxtest-stats' were found the corresponding settings get updated.
+
+    Args:
+        settings (dict) : settings dictionary
+        line (string)   : current STDOUT line to parse
+
+    Returns:
+        (bool)          : True if stats got found, False if not
+
     """
     status = False
 
@@ -505,22 +525,39 @@ def _updateStatsFromStdout(settings, line):
 
 # -----------------------------------------------------------------------------
 def _storeSettingsInEnv(settings):
-    """
+    """Serializes the settings dictionary and stores it in the environment
+    variable 'vfxtest_settings'.
+
+    These stored settings then get extracted and used inside a subprocess.
+
+    Args:
+        settings (dict) : settings dictionary
+
     """
     # serialize and store in environment variable
     json_settings = json.dumps(settings)
     os.environ['vfxtest_settings'] = json_settings
 
+
 # -----------------------------------------------------------------------------
 def _clearSettingsInEnv():
-    """
+    """Clears the environment variable 'vfxtest_settings' if it is set.
+
     """
     if 'vfxtest_settings' in os.environ:
         os.environ.pop('vfxtest_settings')
 
+
 # -----------------------------------------------------------------------------
 def _resolveContextsToRun(settings):
-    """
+    """Returns a list of contexts that we need to run.
+
+    Args:
+        settings (dict) : settings dictionary
+
+    Returns:
+        (list)          : list of contexts to run.
+
     """
     context = settings['context']
     context_details = settings['context_details'][context]
@@ -529,9 +566,17 @@ def _resolveContextsToRun(settings):
 
     return [context,]
 
+
 # -----------------------------------------------------------------------------
 def _getExecutable(settings):
-    """
+    """Resolves and returns the executable for the current context.
+
+    Args:
+        settings (dict) : settings dictionary
+
+    Returns:
+        (string)        : path to the executable
+
     """
     context = settings['context']
     context_details = settings['context_details'][context]
@@ -544,12 +589,19 @@ def _getExecutable(settings):
                                              reuse_existing=True)
         venv_root = os.sep.join([dcc_settings, 'virtualenv_{}'.format(context)])
         if os.path.exists(venv_root):
-            executable = os.sep.join([venv_root, 'Scripts', 'python'])
+            subfolder = 'bin'
+            if sys.platform == 'win32':
+                subfolder = 'Scripts'
+            if os.path.exists('{}/{}'.format(venv_root, subfolder)):
+                executable = os.sep.join([venv_root, subfolder, 'python'])
+
     return executable
+
 
 # -----------------------------------------------------------------------------
 def _getPathToMyself():
-    """
+    """Return absolute path of this file.
+
     """
     # for Python 2 and 3 compatibility we need to ensure a .py suffix
     path_tokens = __file__.split('.')
@@ -557,6 +609,7 @@ def _getPathToMyself():
     path_to_myself = '.'.join(path_tokens)
 
     return os.path.abspath(path_to_myself)
+
 
 # -----------------------------------------------------------------------------
 def _getTargetWrapper(settings):
@@ -570,6 +623,7 @@ def _getTargetWrapper(settings):
                                          name=target_wrapper,
                                          suffix='')
     return target_wrapper
+
 
 # -----------------------------------------------------------------------------
 def _getWrapperPath(settings, name=None, suffix=None):
@@ -593,9 +647,36 @@ def _getWrapperPath(settings, name=None, suffix=None):
 
     return wrapper_path
 
+
+# -----------------------------------------------------------------------------
+def _discoverTests(settings):
+    """Discover all relevant Test Cases.
+
+    Args:
+        settings (dict) : settings dictionary
+
+    Returns:
+        (TestSuite) : test suite to run
+
+    """
+    patterns = [settings['test_file_pattern'],]
+    for item in settings['filter_tokens']:
+        patterns.append('*{}*'.format(item))
+
+    loader = FilteredTestLoader()
+    suite = loader.discover(settings['target'], pattern=patterns)
+
+    return suite
+
+
 # -----------------------------------------------------------------------------
 def _startCoverage(settings):
+    """Start the code coverage.
 
+    Args:
+        settings (dict) : settings dictionary
+
+    """
     omit = []
     # omit myself
     omit.append('*vfxtest.py')
@@ -625,24 +706,19 @@ def _startCoverage(settings):
     #     coverage does not work inside of another coverage run
     return cov # pragma: no cover
 
-# -----------------------------------------------------------------------------
-def _discoverTests(settings):
-    """
-    """
-    patterns = [settings['test_file_pattern'],]
-    for item in settings['filter_tokens']:
-        patterns.append('*{}*'.format(item))
-
-    loader = FilteredTestLoader()
-    suite = loader.discover(settings['target'], pattern=patterns)
-
-    return suite
 
 # -----------------------------------------------------------------------------
 def _stopCoverage(settings, cov, report=True):
+    """Stops the code coverage.
+
+    Args:
+        settings (dict) : settings dictionary
+        cov (coverage)  : coverage object
+        report (bool)   : True if coverage should be reported.
+                          (Optional, defaults to True)
+
     """
-    """
-    # --> can't be covered:
+    # --> 'cov.stop()' can't be covered:
     #     coverage does not work inside of another coverage run
     cov.stop() # pragma: no cover
 
@@ -654,9 +730,30 @@ def _stopCoverage(settings, cov, report=True):
         except coverage.misc.CoverageException as e:
             print('Coverage: no data to report')
 
+
 # -----------------------------------------------------------------------------
 def _getSettings(arg_parser, args):
-    """
+    """Collects and combines all valid settings.
+
+    Also ensures that the 'test_output' folder exists (but will never create
+    its parent folder).
+
+    Settings get collected from:
+        - parsing the command line arguments
+        - settings in the 'vfxtest_settings' environment variable
+        - a config file
+
+    Args:
+        arg_parser (ArgParser)  : ArgumentParser object
+        args (list)             : list of command line arguments
+
+    Returns:
+        (dict)                  : dictionary of combined settings
+
+    Raises:
+        (SystemExit)            : on failure while reading/conforming
+                                  config file
+
     """
     settings = {}
 
@@ -669,30 +766,35 @@ def _getSettings(arg_parser, args):
         else:
             _readConfig(settings)
 
-        # # make all paths absolute
-        # for key in ['cfg', 'target', 'test_output']:
-        #     settings[key] = os.path.abspath(settings[key])
-
-        # create 'test_output' if needed, but never create it's parent folder
-        test_output = settings['test_output']
-        parent_folder = os.path.dirname(test_output)
-        if not os.path.exists(parent_folder):
-            raise OSError("Folder does not exist: '{}'"
-                           .format(parent_folder))
-        if not os.path.exists(test_output):
-            os.makedirs(test_output)
-
     except Exception as e:
         if not isinstance(e, ValueError):
             print('Failed to read and conform config:\n{}\n{}'
                    .format(e, traceback.format_exc()))
-        raise(SystemExit)
+        raise SystemExit
+
+    # create a fresh 'test_output' folder, but never create its parent folder
+    test_output = settings['test_output']
+    parent_folder = os.path.dirname(test_output)
+    if not os.path.exists(parent_folder):
+        raise SystemExit("Folder does not exist: '{}'"
+                       .format(parent_folder))
+    if not os.path.exists(test_output):
+        os.makedirs(test_output)
 
     return settings
 
+
 # -----------------------------------------------------------------------------
 def _recoverSettingsFromEnv(settings):
-    """
+    """Recovers settings from the environment variable 'vfxtest_settings'
+    and replaces the contents of the settings dictionary accordingly.
+
+    This environment variable gets used to pass down settings into a
+    vfxtest subprocess.
+
+    Args:
+        settings (dict) : settings dictionary
+
     """
     serialized = os.environ['vfxtest_settings']
     recovered_settings = json.loads(serialized)
@@ -701,9 +803,28 @@ def _recoverSettingsFromEnv(settings):
 
     settings['subprocess'] = True
 
+
 # -----------------------------------------------------------------------------
 def _readConfig(settings):
-    """
+    """Reads a vfxtest config file and updates the settings dictionary
+    accordingly.
+    Also ensures default values for a bunch of settings in case they are
+    not explicitely specified.
+
+    Respects the path to a config file stored in the 'cfg' value of
+    the settings dictionary.
+    Otherwise falls back to expecting 'vfxtest.cfg' in the current
+    working directory, or its parent directory.
+
+    The config file must contain valid JSON, but can also contain lines
+    commented out with the # sign.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    Raises:
+        (Exception)         : on Problems decoding JSON
+
     """
     # prefer 'vfxtest.cfg' in current folder, fallback to parent folder
     if settings['cfg'] is None:
@@ -778,22 +899,17 @@ def _readConfig(settings):
 
     settings['subprocess'] = False
 
-# -----------------------------------------------------------------------------
-def _extractLineNumber(e):
-    """
-    """
-    lineno = -1
-    try:
-        right_side = str(e).split('line ')[1]
-        number = right_side.split(' ')[0]
-        lineno = int(number)
-    except Exception as e:
-        pass
-    return lineno
 
 # -----------------------------------------------------------------------------
 def _logJsonError(cfg_path, e, lines):
-    """
+    """Prints out a meaningful JSON error with correct line numbers and the
+    correct highlighted part of the offending JSON.
+
+    Args:
+        cfg_path (string)   :   path to the config file
+        e (Exception)       :   thrown Exception object
+        lines (list)        :   json source lines (with stripped comments)
+
     """
     offending_lineno = _extractLineNumber(e)
 
@@ -821,15 +937,40 @@ def _logJsonError(cfg_path, e, lines):
     print('='*80)
     print('')
 
+
+# -----------------------------------------------------------------------------
+def _extractLineNumber(e):
+    """Attempts to extract the offending line number from the thrown exception.
+
+    Args:
+        e (Exception) : Exception object
+
+    Returns:
+        (int)   : offending line number, or -1
+
+    """
+    lineno = -1
+    try:
+        right_side = str(e).split('line ')[1]
+        number = right_side.split(' ')[0]
+        lineno = int(number)
+    except Exception as e:
+        pass
+    return lineno
+
+
 # -----------------------------------------------------------------------------
 def _printHighlighted(line):
+    """Prints a highlighted line to STDOUT (white text on red background).
 
+    """
     # uses the awesome colorama package
     styled = '{}{}{}{}'.format(colorama.Fore.WHITE,
                                colorama.Back.RED,
                                line,
                                colorama.Style.RESET_ALL)
     print(styled)
+
 
 # -------------------------------------------------------------------------
 def _createTestRootFolder(settings, name, reuse_existing=False):
@@ -867,6 +1008,7 @@ def _createTestRootFolder(settings, name, reuse_existing=False):
 
     return testsuite_root
 
+
 # -----------------------------------------------------------------------------
 def _collectVirtualEnvDetails(settings, root_folder):
     """
@@ -884,6 +1026,7 @@ def _collectVirtualEnvDetails(settings, root_folder):
 
     return result
 
+
 # -----------------------------------------------------------------------------
 def _ensureVirtualEnvs(settings, root_folder):
     """
@@ -894,6 +1037,7 @@ def _ensureVirtualEnvs(settings, root_folder):
         if not os.path.exists(venv_path):
             executable = virtualenvs[venv_path]
             _initializeVirtualEnv(settings, venv_path, executable)
+
 
 # -----------------------------------------------------------------------------
 def _initializeVirtualEnv(settings, venv_path, executable):
@@ -929,17 +1073,52 @@ def _initializeVirtualEnv(settings, venv_path, executable):
         print('/'*80)
         print('')
 
+
 # -----------------------------------------------------------------------------
-def __stringToBool(value):
+def _resolvePopenClass():
+    """Returns the correct Popen class to use.
+
+    In Python 3.x we use the native subprocess.Popen class, as this can already
+    be used as a Context Manager natively.
+
+    For Python 2.x contexts we return our own wrapped PopenWithContextManager
+    class.
+
+    Returns:
+        (class)     : Popen class to use
+
     """
-    """
-    if value.lower() in ('true', '1', 'y', 'yes'):
-        return True
-    if value.lower() in ('false', '0', 'n', 'no'):
-        return False
-    raise argparse.ArgumentTypeError('Boolean value expected.')
+    Popen = subprocess.Popen
+    if not hasattr(Popen, '__enter__'):
+        Popen = PopenWithContextManager  # pragma: no cover_3
+    return Popen
 
 
+# -----------------------------------------------------------------------------
+class PopenWithContextManager(subprocess.Popen): # pragma: no cover_3
+    """A wrapper around subproces.Popen that also is a Context Manager.
+
+    Python 3.x already supports this out of the box.
+    Therefore we use this in Python 2.x contexts.
+
+    """
+
+    # -------------------------------------------------------------------------
+    def __enter__(self):
+        return self
+
+    # -------------------------------------------------------------------------
+    def __exit__(self, exc_type, value, traceback):
+        if self.stdout:
+            self.stdout.close()
+        if self.stderr:
+            self.stderr.close()
+        try:  # Flushing a BufferedWriter may raise an error
+            if self.stdin:
+                self.stdin.close()
+        finally:
+            # Wait for the process to terminate, to avoid zombies.
+            self.wait()
 
 # -----------------------------------------------------------------------------
 class FilteredTestLoader(unittest.TestLoader):
@@ -991,7 +1170,6 @@ class TextTestRunner(unittest.TextTestRunner):
     This you can query the settings and test_root from inside your test case
     implementation.
 
-
     """
 
     # -------------------------------------------------------------------------
@@ -1030,9 +1208,10 @@ class TestCase(unittest.TestCase):
     as 'test_root',  'setttings' or 'context'.
 
     """
+
     __test_root = None
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def __init__(self, methodName='runTest', test_run=False,  *args, **kwargs):
         """
         """
@@ -1041,47 +1220,61 @@ class TestCase(unittest.TestCase):
         if not test_run:
             super(TestCase, self).__init__(methodName, *args, **kwargs)
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @property
     def test_root(self):
+        """Gives access to the current test_root folder path inside
+        the TestCase.
+
+        """
         return TestCase.__test_root
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @test_root.setter
     def test_root(self, value):
         TestCase.__test_root = value
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @property
     def settings(self):
+        """Gives access to the settings dictionary inside the TestCase.
+
+        """
         return self.__settings
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @settings.setter
     def settings(self, value):
         if isinstance(value, dict):
             self.__settings = value
             TestCase.test_output = self.settings.get('test_output', None)
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @property
     def context(self):
+        """Returns current context.
+        """
         return self.settings.get('context', 'unknown')
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @property
     def context_settings(self):
+        """Returns current context settings.
+        """
         all_details = self.settings.get('context_details', {})
         return all_details.get(self.context, {})
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def setUpClass(cls, *args, **kwargs):
+        """Executes TestCase.setupClass, and also prints our test header.
+        """
         super(TestCase, cls).setUpClass(*args, **kwargs)
         cls.logHeader()
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @classmethod
     def logHeader(cls):
-        """Prints the test header."""
+        """Prints the test header.
+        """
         print('')
         print('-' * 70)
         print("    Running tests in '{}'".format(cls.__name__))
