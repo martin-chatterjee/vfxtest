@@ -833,26 +833,29 @@ def _readConfig(settings):
         else:
             settings['cfg'] = '../vfxtest.cfg'
     # read out cfg and strip comments
-    with open(settings['cfg'], 'r') as f:
-        content = f.read()
-    # strip comments and empty lines
-    lines = []
-    for line in content.split('\n'):
-        tokens = line.split('#')
-        relevant = tokens[0]
-        if len(relevant.strip()) > 0:
-            lines.append(relevant)
-    try:
-        # interpret as json and add to settings
-        json_string = '\n'.join(lines)
-        cfg = json.loads(json_string)
-    except Exception as e:
-    # except ValueError as e:
-    # except json.decoder.JSONDecodeError as e:
-        _logJsonError(settings['cfg'], e, lines)
-        raise
+    content = ''
+    if os.path.exists(settings['cfg']):
+        with open(settings['cfg'], 'r') as f:
+            content = f.read()
+        # strip comments and empty lines
+        lines = []
+        for line in content.split('\n'):
+            tokens = line.split('#')
+            relevant = tokens[0]
+            if len(relevant.strip()) > 0:
+                lines.append(relevant)
+        try:
+            # interpret as json and add to settings
+            json_string = '\n'.join(lines)
+            cfg = json.loads(json_string)
+        except Exception as e:
+        # except ValueError as e:  --> Python 2.7
+        # except json.decoder.JSONDecodeError as e:  --> Python 3.7
+            _logJsonError(settings['cfg'], e, lines)
+            raise
 
-    settings.update(cfg)
+        settings.update(cfg)
+
     # initialize a few settings
     if not 'include_test_files' in settings:
         settings['include_test_files'] = False
