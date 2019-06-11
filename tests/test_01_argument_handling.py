@@ -94,7 +94,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         self.assertEqual(result_a, result_b)
 
-        os.rmdir('./test_output')
+        os.rmdir('./vfxtest_output')
 
     # -------------------------------------------------------------------------
     def test05_collectSettings_invalid_boolean_string_raises_SystemExit(self):
@@ -181,7 +181,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         result_b['subprocess'] = None
         self.assertEqual(result_a, result_b)
 
-        os.rmdir('./test_output')
+        os.rmdir('./vfxtest_output')
 
     # -------------------------------------------------------------------------
     def test11_collectSettings_invalid_cfg_file_prints_useful_error_and_raises_SystemExit(self):

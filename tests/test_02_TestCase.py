@@ -81,7 +81,7 @@ class TestCaseTestCase(unittest.TestCase):
 
         runner = vfxtest.TextTestRunner()
         settings = vfxtest.collectSettings()
-        settings['test_output'] = invalid_test_output
+        settings['output_folder'] = invalid_test_output
 
         with self.assertRaises(OSError):
             vfxtest._createTestRootFolder(settings=settings, name=['invalid'])

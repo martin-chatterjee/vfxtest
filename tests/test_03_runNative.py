@@ -40,7 +40,7 @@ class RunNativeTestCase(unittest.TestCase):
 
         settings = vfxtest.collectSettings()
 
-        cov_file = os.path.abspath('{}/.coverage.native'.format(settings['test_output']))
+        cov_file = os.path.abspath('{}/.coverage.native'.format(settings['output_folder']))
         if os.path.exists(cov_file):
             os.remove(cov_file)
         vfxtest.runNative(settings=settings, use_coverage=True)
@@ -67,13 +67,13 @@ class RunNativeTestCase(unittest.TestCase):
         vfxtest.runNative(settings=settings)
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 3)
-        self.assertTrue(os.path.exists('{}/.coverage.differentContext'.format(settings['test_output'])))
+        self.assertTrue(os.path.exists('{}/.coverage.differentContext'.format(settings['output_folder'])))
 
         settings = vfxtest.collectSettings()
         vfxtest.combineCoverages(settings)
 
-        self.assertFalse(os.path.exists('{}/.coverage.differentContext'.format(settings['test_output'])))
-        self.assertTrue(os.path.exists('{}/.coverage'.format(settings['test_output'])))
+        self.assertFalse(os.path.exists('{}/.coverage.differentContext'.format(settings['output_folder'])))
+        self.assertTrue(os.path.exists('{}/.coverage'.format(settings['output_folder'])))
 
     # -------------------------------------------------------------------------
     def test04_resolveContext_defaults_to_native(self):

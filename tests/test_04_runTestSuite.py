@@ -52,7 +52,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
 
         settings = vfxtest.collectSettings()
 
-        cov_file = os.path.abspath('{}/.coverage.python3.x'.format(settings['test_output']))
+        cov_file = os.path.abspath('{}/.coverage.python3.x'.format(settings['output_folder']))
         if os.path.exists(cov_file):
             os.remove(cov_file)
 
@@ -70,10 +70,10 @@ class RunTestSuiteTestCase(unittest.TestCase):
 
         settings = vfxtest.collectSettings()
 
-        cov_file_3 = os.path.abspath('{}/.coverage.python3.x'.format(settings['test_output']))
+        cov_file_3 = os.path.abspath('{}/.coverage.python3.x'.format(settings['output_folder']))
         if os.path.exists(cov_file_3):
             os.remove(cov_file_3)
-        cov_file_2 = os.path.abspath('{}/.coverage.python2.x'.format(settings['test_output']))
+        cov_file_2 = os.path.abspath('{}/.coverage.python2.x'.format(settings['output_folder']))
         if os.path.exists(cov_file_2):
             os.remove(cov_file_2)
 

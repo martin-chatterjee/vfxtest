@@ -23,6 +23,17 @@ provides you with combined code coverage metrics for all of them.
 
 """
 
+"""
+*** - rename output folder
+*** - derive 'ignore' from executable
+- come up with workflow that works with a pip-installed vfxtest installation!
+- what's up with requirements.txt in mayapy/maya/hython/houdini/...?
+        --> use lib/site-packages from python virtualenv?!?
+- keep it simple!
+- auto-generate wrapper scripts in subfolders(?!?)
+-
+"""
+
 import argparse
 import copy
 from fnmatch import fnmatch
@@ -331,7 +342,7 @@ def combineCoverages(settings):
         settings (dict)     :  dictionary holding all our settings
 
     """
-    test_output = settings['test_output']
+    test_output = settings['output_folder']
     data_file='{}/.coverage'.format(test_output)
     cov = coverage.Coverage(data_file=data_file)
     cov.combine()
@@ -680,12 +691,27 @@ def _startCoverage(settings):
     omit = []
     # omit myself
     omit.append('*vfxtest.py')
-    # omit everythin in 'test_output'
-    omit.append('{}/*'.format(settings['test_output']))
+    # omit everythin in 'output_folder'
+    omit.append('{}/*'.format(settings['output_folder']))
     # add omit_coverage tokens from config
     context = settings['context']
     context_details = settings.get('context_details', {}).get(context, {})
     omit_coverage = context_details.get('omit_coverage', [])
+    # omit root folder of executable
+    executable = context_details.get('executable', '')
+
+    # --> can't be covered:
+    #     coverage does not work inside of another coverage run
+    if os.path.exists(executable): # pragma: no cover
+        basename = os.path.basename(executable).lower()
+        omit_root_folder = os.path.dirname(executable)
+        if (basename.find('maya') != -1 or
+            basename.find('hython') != -1 or
+            basename.find('houdini') != -1
+        ):
+            omit_root_folder = os.path.dirname(omit_root_folder)
+        omit_root_folder = omit_root_folder.replace('\\', '/')
+        omit_coverage.append('{}/*'.format(omit_root_folder))
     if isinstance(omit_coverage, list) or isinstance(omit_coverage, tuple):
         omit.extend(omit_coverage)
     # omit all test files
@@ -697,7 +723,7 @@ def _startCoverage(settings):
         test_file_pattern = prefix + settings['test_file_pattern']
         omit.append(test_file_pattern)
 
-    data_file='{}/.coverage'.format(settings['test_output'])
+    data_file='{}/.coverage'.format(settings['output_folder'])
     cov = coverage.Coverage(omit=omit,
                             data_file=data_file,
                             data_suffix=settings['context'])
@@ -735,7 +761,7 @@ def _stopCoverage(settings, cov, report=True):
 def _getSettings(arg_parser, args):
     """Collects and combines all valid settings.
 
-    Also ensures that the 'test_output' folder exists (but will never create
+    Also ensures that the 'output_folder' folder exists (but will never create
     its parent folder).
 
     Settings get collected from:
@@ -772,12 +798,12 @@ def _getSettings(arg_parser, args):
                    .format(e, traceback.format_exc()))
         raise SystemExit
 
-    # create a fresh 'test_output' folder, but never create its parent folder
-    test_output = settings['test_output']
+    # create a fresh output folder, but never create its parent folder
+    test_output = settings['output_folder']
     parent_folder = os.path.dirname(test_output)
     if not os.path.exists(parent_folder):
         raise SystemExit("Folder does not exist: '{}'"
-                       .format(parent_folder))
+                          .format(parent_folder))
     if not os.path.exists(test_output):
         os.makedirs(test_output)
 
@@ -827,11 +853,16 @@ def _readConfig(settings):
 
     """
     # prefer 'vfxtest.cfg' in current folder, fallback to parent folder
+    explicit_cfg = True
     if settings['cfg'] is None:
+        explicit_cfg = False
         if os.path.exists('./vfxtest.cfg'):
             settings['cfg'] = './vfxtest.cfg'
         else:
             settings['cfg'] = '../vfxtest.cfg'
+    # deal with explicit config that can not be read
+    if explicit_cfg is True and not os.path.exists(settings['cfg']):
+        raise IOError('Config file does not exist: {}'.format(settings['cfg']))
     # read out cfg and strip comments
     content = ''
     if os.path.exists(settings['cfg']):
@@ -861,8 +892,8 @@ def _readConfig(settings):
         settings['include_test_files'] = False
     if not 'test_file_pattern' in settings:
         settings['test_file_pattern'] = 'test*.py'
-    if not 'test_output' in settings:
-        settings['test_output'] = './test_output'
+    if not 'output_folder' in settings:
+        settings['output_folder'] = './vfxtest_output'
     if not 'context_details' in settings:
         settings['context_details'] = {}
     if not 'wrapper_scripts' in settings:
@@ -894,7 +925,7 @@ def _readConfig(settings):
     stored_wd = os.getcwd()
     try:
         os.chdir(os.path.dirname(settings['cfg']))
-        settings['test_output'] = os.path.abspath(settings['test_output'])
+        settings['output_folder'] = os.path.abspath(settings['output_folder'])
     finally:
         os.chdir(stored_wd)
 
@@ -977,14 +1008,14 @@ def _printHighlighted(line):
 
 # -------------------------------------------------------------------------
 def _createTestRootFolder(settings, name, reuse_existing=False):
-    """Creates a sandboxed test_root folder inside the 'test_output'
+    """Creates a sandboxed test_root folder inside the 'output_folder'
     folder specified in 'settings'. The name of the test_root folder
     will match the name of the TestCase.
 
     If the test_root folder already exists, it will get deleted
     and recreated.
 
-    However if 'test_output' does not exist it will raise an OSError.
+    However if the output folder does not exist it will raise an OSError.
 
     Args:
         settings (dict)      :  dictionary holding all our settings
@@ -994,10 +1025,10 @@ def _createTestRootFolder(settings, name, reuse_existing=False):
         (string)        :  absolute path of test_root
 
     Raises:
-        (OSError)       :  if 'test_output' does not exist
+        (OSError)       :  if the output folder does not exist
 
     """
-    test_output = settings.get('test_output', None)
+    test_output = settings.get('output_folder', None)
     if not os.path.exists(test_output):
         raise OSError("Invalid test_output: {}".format(test_output))
 
@@ -1248,7 +1279,7 @@ class TestCase(unittest.TestCase):
     def settings(self, value):
         if isinstance(value, dict):
             self.__settings = value
-            TestCase.test_output = self.settings.get('test_output', None)
+            TestCase.test_output = self.settings.get('output_folder', None)
 
     # -------------------------------------------------------------------------
     @property
