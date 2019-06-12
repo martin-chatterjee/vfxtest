@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
@@ -27,13 +28,13 @@ provides you with combined code coverage metrics for all of them.
 *** - rename output folder
 *** - derive 'ignore' from executable
 *** - remove colorama dependency
-- come up with workflow that works with a pip-installed vfxtest installation!
-- what's up with requirements.txt in mayapy/maya/hython/houdini/...?
-        --> create a pure-python lib folder ?!?
-            (coverage, mock, virtualenv)
-        --> use lib/site-packages from python virtualenv?!?
-- keep it simple!
-- auto-generate wrapper scripts in subfolders(?!?)
+*** - keep it simple!
+*** - come up with workflow that works with a pip-installed vfxtest installation!
+*** - what's up with requirements.txt in mayapy/maya/hython/houdini/...?
+***        --> create a pure-python lib folder ?!?
+***            (coverage, mock, virtualenv)
+***        --> use lib/site-packages from python virtualenv?!?
+*** - auto-generate wrapper scripts in subfolders(?!?)
 -
 """
 
@@ -68,8 +69,8 @@ def runMain(args=[]):
     Collects and validates **settings** from both the passed in arguments as
     well as the config file.
     Then runs the test suite found directly in the 'target' folder specified
-    in 'settings', followed by all other test suites found in subfolders of
-    'target'.
+    in 'settings', followed by all other test suites specified in the config
+    file.
     Finally combines all coverage reports into one, and reports it both to
     STDOUT and to HTML.
 
@@ -84,6 +85,7 @@ def runMain(args=[]):
 
     """
     settings = collectSettings(args)
+    prepareEnvironment(settings)
     runTestSuite(settings)
 
     if settings['subprocess'] is False:
@@ -109,9 +111,31 @@ def collectSettings(args=[]):
 
     """
     arg_parser = _defineArguments()
-    settings = _getSettings(arg_parser, args)
+    settings = _compileSettings(arg_parser, args)
 
     return settings
+
+
+# -----------------------------------------------------------------------------
+def prepareEnvironment(settings):
+    """Prepares the testing environment.
+
+    First ensures that our output folder exists.
+    Makes sure that all needed Python virtual environments are prepared.
+    Also prepares a PYTHONPATH folder holding copies of all our pure-python
+    requirement modules.
+
+    Args:
+        settings (dict) : settings dictionary
+
+    """
+    _ensureOutputFolder(settings)
+    settings['dcc_settings_path'] = _createTestRootFolder(settings,
+                                                          name='_dcc_settings',
+                                                          reuse_existing=True)
+    _preparePythonPath(settings)
+    _prepareHelpers(settings)
+    _ensureVirtualEnvs(settings)
 
 
 # -----------------------------------------------------------------------------
@@ -139,148 +163,7 @@ def runTestSuite(settings, report=True):
         return
 
     for context in _resolveContextsToRun(settings):
-        try:
-            # start with copy of settings, update context
-            ctxt_settings = copy.deepcopy(settings)
-            ctxt_settings['context'] = context
-
-            _storeSettingsInEnv(ctxt_settings)
-
-            wrapper = _getWrapperPath(ctxt_settings)
-            executable = _getExecutable(ctxt_settings)
-            vfxtest_root = os.path.dirname(_getPathToMyself())
-            dcc_settings_root = _createTestRootFolder(settings,
-                                                      name='_dcc_settings',
-                                                      reuse_existing=True)
-            _ensureVirtualEnvs(settings, dcc_settings_root)
-
-            args = [wrapper,
-                    executable,
-                    vfxtest_root,
-                    dcc_settings_root,
-                    str(settings['debug_mode'])]
-
-            # deal with target_wrapper
-            target_wrapper = _getTargetWrapper(ctxt_settings)
-            if os.path.exists(target_wrapper):
-                args.append(target_wrapper)
-
-            # deal with virtualenv activation and deactivation
-            if executable.find('virtualenv_{}'.format(context)) != -1:
-                activate = os.sep.join([os.path.dirname(executable), 'activate'])
-                deactivate = os.sep.join([os.path.dirname(executable), 'deactivate'])
-                args.insert(0, activate)
-                args.insert(1, '&&')
-                args.append('&&')
-                args.append(deactivate)
-
-            print('')
-            print('/'*80)
-            status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
-                           .format(os.path.basename(settings['target']), context))
-            status_line += '/'*(80-len(status_line))
-            print (status_line)
-            print('')
-            sys.stdout.flush()
-
-            if settings['debug_mode']:
-                print('')
-                print('[DBG] Wrapper call:')
-                print('      -------------')
-                print('      ' + ' '.join(args))
-                print('')
-                print('[DBG] target folder:')
-                print('      -------------')
-                print('      ' + ctxt_settings['target'])
-                print('')
-                print('[DBG] target context:')
-                print('      --------------')
-                print('      ' + ctxt_settings['context'])
-                print('')
-                print('[DBG] dcc settings root:')
-                print('      -----------------')
-                print('      ' + dcc_settings_root)
-                print('')
-                print('')
-                sys.stdout.flush()
-
-            Popen = _resolvePopenClass()
-            with Popen(args=args,
-                       bufsize=0,
-                       shell=True,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT) as proc:
-                sys.stdout.flush()
-                while True:
-                    line = proc.stdout.readline().decode('utf-8')
-                    if not line:
-                        break
-                    if not _updateStatsFromStdout(settings, line):
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-                returncode = proc.wait()
-
-            if settings['debug_mode']:
-                print('')
-                print('[DBG] --> Process Return Code: {}'
-                       .format(returncode))
-                print('')
-                print('')
-                print ('/'*80)
-                print('')
-                sys.stdout.flush()
-
-            # stop here on internal child process error
-            if returncode != 0:
-                print("vfxtest ERROR: '{}' returned with error code {}. Stopping here..."
-                       .format(settings['context'], returncode))
-                raise(SystemExit)
-
-        except Exception as e:
-            traceback.print_exc()
-            raise(e)
-        finally:
-            _clearSettingsInEnv()
-
-
-# -----------------------------------------------------------------------------
-def runChildTestSuites(settings):
-    """Runs every child test suite found in 'target' in it's appropriate
-    context.
-
-    Every subfolder of 'target' that is named like a known context gets
-    run.
-
-    Args:
-        settings (dict)     :  dictionary holding all our settings
-
-    Raises:
-        (Exception)         : any internal exception will be re-raised
-
-    """
-    child_settings = settings.copy()
-    target = child_settings['target']
-
-    # run child test suites in alphabetical order, but do 'Python' first
-    def sort_python_first(item):
-        if item.lower().startswith('python'):
-            return 0
-        return 1
-    children = sorted(os.listdir(target))
-    children = sorted(children, key=sort_python_first)
-
-    for item in children:
-        if item in child_settings['context_details']:
-            item_path = '{}{}{}'.format(target, os.sep, item)
-            if os.path.isdir(item_path):
-                child_settings['target'] = item_path
-                child_settings['context'] = item
-                print(child_settings['context'])
-                runTestSuite(child_settings)
-
-    settings['files_run'] = child_settings['files_run']
-    settings['tests_run'] = child_settings['tests_run']
-    settings['errors'] = child_settings['errors']
+        runInSubprocess(settings, context)
 
 
 # -----------------------------------------------------------------------------
@@ -331,6 +214,155 @@ def runNative(settings, report=True, use_coverage=True):
 
     if settings['context'] != 'native':
         encodeStatsIntoStdout(settings)
+
+
+# -----------------------------------------------------------------------------
+def runInSubprocess(settings, context):
+    """Runs the test suite for context in a spawned subprocess using the
+    correct Python executable.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+        settings (string)   :  name of the context to run
+    Raises:
+        (Exception)         : any internal exception will be re-raised
+
+    """
+    try:
+        # start with copy of settings, update context
+        ctxt_settings = copy.deepcopy(settings)
+        ctxt_settings['context'] = context
+
+        env = _preparePatchedEnvironment(ctxt_settings, context)
+        executable = _getExecutable(ctxt_settings)
+        vfxtest_py = _getPathToMyself()
+        args = [executable,]
+
+        if context.lower().find('mayapy') != -1:
+            args.append(vfxtest_py)
+
+        elif context.lower().find('maya') != -1:
+            args.append('-command')
+            args.append('"source vfxtest_maya; vfxtestSchedule()"')
+
+        elif context.lower().find('hython') != -1:
+            args.append(vfxtest_py)
+
+        elif context.lower().find('houdini') != -1:
+            dcc_settings = settings['dcc_settings_path']
+            hou_helper = '{}/helpers/vfxtest_houdini.py'.format(dcc_settings)
+            args.append(hou_helper)
+
+        else:
+            args.append(vfxtest_py)
+
+        # deal with virtualenv activation and deactivation
+        if executable.find('virtualenv_{}'.format(context)) != -1:
+            activate = os.sep.join([os.path.dirname(executable), 'activate'])
+            deactivate = os.sep.join([os.path.dirname(executable), 'deactivate'])
+            args.insert(0, activate)
+            args.insert(1, '&&')
+            args.append('&&')
+            args.append(deactivate)
+
+        print('')
+        print('/'*80)
+        status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
+                       .format(os.path.basename(settings['target']), context))
+        status_line += '/'*(80-len(status_line))
+        print (status_line)
+        print('')
+        sys.stdout.flush()
+
+        if settings['debug_mode']:
+            print('')
+            print('[DBG] target folder:')
+            print('      -------------')
+            print('      ' + ctxt_settings['target'])
+            print('')
+            print('[DBG] target context:')
+            print('      --------------')
+            print('      ' + ctxt_settings['context'])
+            print('')
+            print('')
+            sys.stdout.flush()
+
+        Popen = _resolvePopenClass()
+        with Popen(args=args,
+                   bufsize=0,
+                   shell=True,
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.STDOUT,
+                   env=env) as proc:
+            sys.stdout.flush()
+            while True:
+                line = proc.stdout.readline().decode('utf-8')
+                if not line:
+                    break
+                if not _updateStatsFromStdout(settings, line):
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+            returncode = proc.wait()
+
+        if settings['debug_mode']:
+            print('')
+            print('[DBG] --> Process Return Code: {}'
+                   .format(returncode))
+            print('')
+            print('')
+            print ('/'*80)
+            print('')
+            sys.stdout.flush()
+
+        # stop here on internal child process error
+        if returncode != 0:
+            print("vfxtest ERROR: '{}' returned with error code {}. Stopping here..."
+                   .format(settings['context'], returncode))
+            raise(SystemExit)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        raise(e)
+
+
+# -----------------------------------------------------------------------------
+def runChildTestSuites(settings):
+    """Runs every child test suite found in 'target' in it's appropriate
+    context.
+
+    Every subfolder of 'target' that is named like a known context gets
+    run.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    Raises:
+        (Exception)         : any internal exception will be re-raised
+
+    """
+    child_settings = settings.copy()
+    target = child_settings['target']
+
+    # run child test suites in alphabetical order, but do 'Python' first
+    def sort_python_first(item):
+        if item.lower().startswith('python'):
+            return 0
+        return 1
+    children = sorted(os.listdir(target))
+    children = sorted(children, key=sort_python_first)
+
+    for item in children:
+        if item in child_settings['context_details']:
+            item_path = '{}{}{}'.format(target, os.sep, item)
+            if os.path.isdir(item_path):
+                child_settings['target'] = item_path
+                child_settings['context'] = item
+                print(child_settings['context'])
+                runTestSuite(child_settings)
+
+    settings['files_run'] = child_settings['files_run']
+    settings['tests_run'] = child_settings['tests_run']
+    settings['errors'] = child_settings['errors']
 
 
 # -----------------------------------------------------------------------------
@@ -406,7 +438,7 @@ def resolveContext(settings):
     """Resolves the current content by comparing the name of the current
     'target' folder to all known contexts in 'settings'.
 
-    If the context is know, it is returned. Otherwise 'native' gets returned
+    If the context is known, it is returned. Otherwise 'native' gets returned
     as default context.
 
     Args:
@@ -433,13 +465,13 @@ def initContext(settings):
 
     """
     try:
-        if settings['context'] == 'mayapy':
+        if settings['context'].find('mayapy') != -1:
             import maya.standalone
             maya.standalone.initialize()
 
     except Exception as e:
         print("initContext(): {}".format(e))
-        traceback.print_exc()
+        print(traceback.format_exc())
 
 
 # -----------------------------------------------------------------------------
@@ -461,7 +493,7 @@ def _defineArguments():
                              ""
                              "Defaults to 'vfxtest.cfg' in:"
                              "    - the current working directory"
-                             "    - the one root dir of the current working directory")
+                             "    - the parent folder of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
                         help='limits the number of test files that get executed.')
     parser.add_argument('filter_tokens', nargs='*', type=str,
@@ -490,6 +522,51 @@ def __stringToBool(value):
     if value.lower() in ('false', '0', 'n', 'no'):
         return False
     raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+# -----------------------------------------------------------------------------
+def _compileSettings(arg_parser, args):
+    """Collects and combines all valid settings.
+
+    Also ensures that the 'output_folder' folder exists (but will never create
+    its parent folder).
+
+    Settings get collected from:
+        - parsing the command line arguments
+        - settings in the 'vfxtest_settings' environment variable
+        - a config file
+
+    Args:
+        arg_parser (ArgParser)  : ArgumentParser object
+        args (list)             : list of command line arguments
+
+    Returns:
+        (dict)                  : dictionary of combined settings
+
+    Raises:
+        (SystemExit)            : on failure while reading/conforming
+                                  config file
+
+    """
+    settings = {}
+
+    try:
+        # start with arguments
+        settings = vars(arg_parser.parse_args(args=args))
+        # use settings in environment if present, fall back to cfg file
+        if 'vfxtest_settings' in os.environ:
+            _recoverSettingsFromEnv(settings)
+        else:
+            _readConfig(settings)
+            _ensureDefaultSettings(settings)
+
+    except Exception as e:
+        if not isinstance(e, ValueError):
+            print('Failed to read and conform config:\n{}\n{}'
+                   .format(e, traceback.format_exc()))
+        raise SystemExit
+
+    return settings
 
 
 # -----------------------------------------------------------------------------
@@ -535,30 +612,6 @@ def _updateStatsFromStdout(settings, line):
     return status
 
 
-# -----------------------------------------------------------------------------
-def _storeSettingsInEnv(settings):
-    """Serializes the settings dictionary and stores it in the environment
-    variable 'vfxtest_settings'.
-
-    These stored settings then get extracted and used inside a subprocess.
-
-    Args:
-        settings (dict) : settings dictionary
-
-    """
-    # serialize and store in environment variable
-    json_settings = json.dumps(settings)
-    os.environ['vfxtest_settings'] = json_settings
-
-
-# -----------------------------------------------------------------------------
-def _clearSettingsInEnv():
-    """Clears the environment variable 'vfxtest_settings' if it is set.
-
-    """
-    if 'vfxtest_settings' in os.environ:
-        os.environ.pop('vfxtest_settings')
-
 
 # -----------------------------------------------------------------------------
 def _resolveContextsToRun(settings):
@@ -580,8 +633,60 @@ def _resolveContextsToRun(settings):
 
 
 # -----------------------------------------------------------------------------
+def _preparePatchedEnvironment(settings, context):
+    """Creates a duplicate of the current environment and patches all
+    relevant environment variables for this context.
+
+    Args:
+        settings (dict)      : dictionary holding all our settings
+        context (string)     : context to prepare the env for
+
+    Returns:
+        (dict)               : dictionary holding the context
+
+    """
+    env = dict(os.environ)
+
+    # store updated copy fo settings in environment variable
+    json_settings = json.dumps(settings)
+    env['vfxtest_settings'] = json_settings
+    dcc_settings = settings['dcc_settings_path']
+    cwd = os.path.abspath(settings['cwd']).replace('\\', '/')
+
+    # patch PYTHONPATH
+    tokens = []
+    env_var_value = env.get('PYTHONPATH', '')
+    if env_var_value != '':
+        tokens = env_var_value.split(os.pathsep)
+    pythonpath = '{}/PYTHONPATH'.format(dcc_settings)
+    tokens.insert(0, pythonpath)
+    tokens.insert(0, cwd)
+    env['PYTHONPATH'] = os.pathsep.join(tokens)
+
+    # deal with maya contexts
+    context = settings.gets('context', '')
+    if context.lower().find('maya') != -1:
+        env['MAYA_APP_DIR'] = '{}/{}.vfxtest'.format(dcc_settings, context)
+        env['MAYA_SCRIPT_PATH'] = '{}{}{}/helpers'.format(cwd,
+                                                          os.pathsep,
+                                                          dcc_settings)
+        env.pop('MAYA_PLUG_IN_PATH', None)
+        env.pop('MAYA_MODULE_PATH', None)
+
+    # deal with houdini/hython context
+    if (context.lower().find('hython') != -1 or context.lower().find('houdini') != -1):
+        env['HOUDINI_USER_PREF_DIR'] = '{}/hython.vfxtest.__HVER__'.format(dcc_settings)
+        env.pop('HSITE', None)
+
+    return env
+
+
+# -----------------------------------------------------------------------------
 def _getExecutable(settings):
     """Resolves and returns the executable for the current context.
+
+    If this is a standalone Python executable it tries to resolve the correct
+    prepared virtual environment for it.
 
     Args:
         settings (dict) : settings dictionary
@@ -596,9 +701,7 @@ def _getExecutable(settings):
 
     # if this is standalone python then prefer the correct virtualenv
     if context.lower().find('python') != -1:
-        dcc_settings = _createTestRootFolder(settings,
-                                             name='_dcc_settings',
-                                             reuse_existing=True)
+        dcc_settings = settings['dcc_settings_path']
         venv_root = os.sep.join([dcc_settings, 'virtualenv_{}'.format(context)])
         if os.path.exists(venv_root):
             subfolder = 'bin'
@@ -616,48 +719,11 @@ def _getPathToMyself():
 
     """
     # for Python 2 and 3 compatibility we need to ensure a .py suffix
-    path_tokens = __file__.split('.')
-    path_tokens[-1] = 'py'
-    path_to_myself = '.'.join(path_tokens)
+    my_path = __file__.replace('\\', '/')
+    if my_path.endswith('.pyc'):
+        my_path = '{}.py'.format(my_path[:-4])
 
-    return os.path.abspath(path_to_myself)
-
-
-# -----------------------------------------------------------------------------
-def _getTargetWrapper(settings):
-    """
-    """
-    context = settings['context']
-    context_details = settings['context_details'][context]
-    target_wrapper = context_details.get('target_wrapper', '')
-    if target_wrapper != '':
-        target_wrapper = _getWrapperPath(settings,
-                                         name=target_wrapper,
-                                         suffix='')
-    return target_wrapper
-
-
-# -----------------------------------------------------------------------------
-def _getWrapperPath(settings, name=None, suffix=None):
-    """
-    """
-    # use bash for every os execpt Windows
-    if suffix is None:
-        suffix = '.sh'
-        if platform.system() == 'Windows':
-            suffix = '.cmd'
-    if name is None:
-        name = settings['context']
-    wrapper_name = '{}{}'.format(name, suffix)
-    wrapper_path = '{}{}{}'.format(settings['wrapper_scripts'],
-                                   os.sep,
-                                   wrapper_name)
-
-    if not os.path.exists(wrapper_path):
-        raise OSError('Could not find wrapper script:'
-                                '\n{}'.format(wrapper_path))
-
-    return wrapper_path
+    return os.path.abspath(my_path)
 
 
 # -----------------------------------------------------------------------------
@@ -759,59 +825,6 @@ def _stopCoverage(settings, cov, report=True):
 
 
 # -----------------------------------------------------------------------------
-def _getSettings(arg_parser, args):
-    """Collects and combines all valid settings.
-
-    Also ensures that the 'output_folder' folder exists (but will never create
-    its parent folder).
-
-    Settings get collected from:
-        - parsing the command line arguments
-        - settings in the 'vfxtest_settings' environment variable
-        - a config file
-
-    Args:
-        arg_parser (ArgParser)  : ArgumentParser object
-        args (list)             : list of command line arguments
-
-    Returns:
-        (dict)                  : dictionary of combined settings
-
-    Raises:
-        (SystemExit)            : on failure while reading/conforming
-                                  config file
-
-    """
-    settings = {}
-
-    try:
-        # start with arguments
-        settings = vars(arg_parser.parse_args(args=args))
-        # use settings in environment if present, fall back to cfg file
-        if 'vfxtest_settings' in os.environ:
-            _recoverSettingsFromEnv(settings)
-        else:
-            _readConfig(settings)
-
-    except Exception as e:
-        if not isinstance(e, ValueError):
-            print('Failed to read and conform config:\n{}\n{}'
-                   .format(e, traceback.format_exc()))
-        raise SystemExit
-
-    # create a fresh output folder, but never create its parent folder
-    test_output = settings['output_folder']
-    parent_folder = os.path.dirname(test_output)
-    if not os.path.exists(parent_folder):
-        raise SystemExit("Folder does not exist: '{}'"
-                          .format(parent_folder))
-    if not os.path.exists(test_output):
-        os.makedirs(test_output)
-
-    return settings
-
-
-# -----------------------------------------------------------------------------
 def _recoverSettingsFromEnv(settings):
     """Recovers settings from the environment variable 'vfxtest_settings'
     and replaces the contents of the settings dictionary accordingly.
@@ -861,11 +874,9 @@ def _readConfig(settings):
             settings['cfg'] = './vfxtest.cfg'
         else:
             settings['cfg'] = '../vfxtest.cfg'
-    # deal with explicit config that can not be read
-    if explicit_cfg is True and not os.path.exists(settings['cfg']):
-        raise IOError('Config file does not exist: {}'.format(settings['cfg']))
     # read out cfg and strip comments
     content = ''
+
     if os.path.exists(settings['cfg']):
         with open(settings['cfg'], 'r') as f:
             content = f.read()
@@ -885,23 +896,40 @@ def _readConfig(settings):
         # except json.decoder.JSONDecodeError as e:  --> Python 3.7
             _logJsonError(settings['cfg'], e, lines)
             raise
-
         settings.update(cfg)
 
-    # initialize a few settings
+    else:
+        # deal with explicit config that can not be read
+        if explicit_cfg is True:
+            raise IOError('Config file does not exist: {}'.format(settings['cfg']))
+
+
+# -----------------------------------------------------------------------------
+def _ensureDefaultSettings(settings):
+    """Ensures sensible default settings.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    """
+    # user-facing settings
     if not 'include_test_files' in settings:
         settings['include_test_files'] = False
     if not 'test_file_pattern' in settings:
         settings['test_file_pattern'] = 'test*.py'
     if not 'output_folder' in settings:
         settings['output_folder'] = './vfxtest_output'
+
+    if not 'debug_mode' in settings:
+        settings['debug_mode'] = False
+    if '{}'.format(settings['debug_mode']).lower() == 'true':
+        settings['debug_mode'] = True
+    if not settings['debug_mode'] == True:
+        settings['debug_mode'] = False
+
+    # internal settings
     if not 'context_details' in settings:
         settings['context_details'] = {}
-    if not 'wrapper_scripts' in settings:
-        wrapper_scripts = ('{}{}wrapper_scripts'
-                            .format(os.path.dirname(__file__), os.sep))
-        settings['wrapper_scripts'] = wrapper_scripts
-
     if not 'files_run' in settings:
         settings['files_run'] = 0
     if not 'tests_run' in settings:
@@ -909,15 +937,9 @@ def _readConfig(settings):
     if not 'errors' in settings:
         settings['errors'] = 0
 
-    if not 'debug_mode' in settings:
-        settings['debug_mode'] = False
-    # sanitize debug_mode
-    if '{}'.format(settings['debug_mode']).lower() == 'true':
-        settings['debug_mode'] = True
-    if not settings['debug_mode'] == True:
-        settings['debug_mode'] = False
-
     settings['cwd'] = os.getcwd()
+    settings['context'] = resolveContext(settings)
+    settings['subprocess'] = False
 
     # make all paths absolute
     for key in ['cfg', 'target']:
@@ -929,10 +951,6 @@ def _readConfig(settings):
         settings['output_folder'] = os.path.abspath(settings['output_folder'])
     finally:
         os.chdir(stored_wd)
-
-    settings['context'] = resolveContext(settings)
-
-    settings['subprocess'] = False
 
 
 # -----------------------------------------------------------------------------
@@ -1029,28 +1047,153 @@ def _createTestRootFolder(settings, name, reuse_existing=False):
 
 
 # -----------------------------------------------------------------------------
-def _collectVirtualEnvDetails(settings, root_folder):
-    """
-    """
-    result = {}
+def _ensureOutputFolder(settings):
+    """Ensures that the output folder exists.
 
-    for context in settings['context_details']:
-        if context.lower().find('python') != -1:
-            details = settings['context_details'][context]
-            executable = details.get('executable', '')
-            if os.path.exists(executable):
-                venv_name = 'virtualenv_{}'.format(context)
-                venv_path = '{}{}{}'.format(root_folder, os.sep, venv_name)
-                result[venv_path] = executable
+    Will create a the output folder, but will never create its parent folder.
 
-    return result
+    Args:
+        settings (dict) : settings dictionary
+
+    """
+    test_output = settings['output_folder']
+    parent_folder = os.path.dirname(test_output)
+    if not os.path.exists(parent_folder):
+        raise SystemExit("Folder does not exist: '{}'"
+                          .format(parent_folder))
+    if not os.path.exists(test_output):
+        os.makedirs(test_output)
 
 
 # -----------------------------------------------------------------------------
-def _ensureVirtualEnvs(settings, root_folder):
+def _prepareHelpers(settings):
+    """Ensures that all needed helpers start scripts do exist.
+
+    Args:
+        settings (dict) : settings dictionary
+
     """
+    helpers = '{}/helpers'.format(settings['dcc_settings_path'])
+    if not os.path.exists(helpers):
+        os.makedirs(helpers)
+
+    _ensureHoudiniHelper(helpers)
+    _ensureMayaHelper(helpers)
+
+
+# -----------------------------------------------------------------------------
+def _preparePythonPath(settings):
+    """Creates a PYTHONPATH folder in dcc_settings_path and copies all
+    our pure-python requirements in there.
+
+    If the folder already exists it will not be recreated.
+
+    Right now copies over these modules:
+        coverage
+        mock
+        vfxtest
+
+    Later on we will point the PYTHONPATH environment variable to this
+    folder for our child processes.
+    This way all embedded Python interpreters inside a DCC will be able
+    run vfxtest and its required modules.
+
+    Args:
+        settings (dict) : settings dictionary
+
     """
-    virtualenvs = _collectVirtualEnvDetails(settings, root_folder)
+    pythonpath = '{}/PYTHONPATH'.format(settings['dcc_settings_path'])
+    if not os.path.exists(pythonpath):
+        os.makedirs(pythonpath)
+
+
+    relevant_modules = ['coverage',
+                        'mock',
+                        'vfxtest',
+                       ]
+    for name in relevant_modules:
+        try:
+            print('-'*80)
+            print('copying over {}...'.format(name))
+            # deal with package
+            module = importlib.import_module(name)
+            if hasattr(module, '__path__'):
+                module_path = module.__path__.replace('\\', '/')
+                shutil.copytree(module_path, pythonpath)
+            # deal with single file module
+            else:
+                module_path = module.__file__.replace('\\', '/')
+                if module_path.endswith('.pyc'):
+                    module_path = '{}.py'.format(module_path[:-4])
+                shutil.copyfile(module_path, pythonpath)
+            print('...Done')
+        except Exception as e:
+            print('...Caught this exception: {}'.format(e))
+            print(traceback.format_exc())
+
+
+# -----------------------------------------------------------------------------
+def _ensureMayaHelper(target_path):
+    """Ensures the Maya Helper MEL script necessary to run tests inside
+    an interactive Maya session.
+
+    Args:
+        target_path (string)   : target folder path
+
+    """
+    maya_helper = '{}/vfxtest_maya.mel'.format(target_path)
+
+    if not os.path.exists(maya_helper):
+
+        code = [
+            'global proc vfxtestSchedule() {',
+            '    string $python = "import vfxtest; vfxtest.mayaScheduleDelayed()";',
+            '    evalDeferred `python $python`;',
+            '}',
+        ]
+
+        with open(maya_helper, 'w') as f:
+            f.write('\n'.join(code))
+
+
+# -----------------------------------------------------------------------------
+def _ensureHoudiniHelper(target_path):
+    """Ensures the Houdini Helper Python module necessary to run tests inside
+    an interactive Houdini session.
+
+    Args:
+        target_path (string)   : target folder path
+
+    """
+    hou_helper = '{}/vfxtest_houdini.py'.format(target_path)
+
+    if not os.path.exists(hou_helper):
+
+        code = [
+            "import vfxtest",
+            "",
+            "if __name__ == '__main__':",
+            "    vfxtest.houdiniScheduleDelayed()",
+        ]
+
+        with open(hou_helper, 'w') as f:
+            f.write('\n'.join(code))
+
+
+# -----------------------------------------------------------------------------
+def _ensureVirtualEnvs(settings):
+    """Makes sure that we have a prepared Python virtual environment
+    prepared for every Python executable specified in context_details.
+
+    If a python executable is not able to create a virtualenv then we ignore
+    this fact for the time being. Later on the actual executable will get
+    used instead of the virtual environment.
+
+    Args:
+        settings (dict)          : dictionary holding all our settings
+
+    """
+    virtualenvs = _collectPythonExecutableDetails(settings)
 
     for venv_path in virtualenvs:
         if not os.path.exists(venv_path):
@@ -1059,38 +1202,158 @@ def _ensureVirtualEnvs(settings, root_folder):
 
 
 # -----------------------------------------------------------------------------
-def _initializeVirtualEnv(settings, venv_path, executable):
+def _collectPythonExecutableDetails(settings):
+    """Extracts details of all  python executables specified in
+    context_details.
+
+    Verifies that those executables exist. Prepares the corresponding
+    virtualenv names and returns all those details.
+
+    Args:
+        settings (dict)          : dictionary holding all our settings
+
+    Returns:
+        (dict)               :  dictionary of details
+
     """
+    dcc_settings_path = settings['dcc_settings_path']
+
+    result = {}
+
+    for context in settings['context_details']:
+        if context.lower().find('python') != -1:
+            details = settings['context_details'][context]
+            executable = details.get('executable', '')
+            if os.path.exists(executable):
+                venv_name = 'virtualenv_{}'.format(context)
+                venv_path = '{}{}{}'.format(dcc_settings_path, os.sep, venv_name)
+                result[venv_path] = executable
+
+    return result
+
+
+# -----------------------------------------------------------------------------
+def _initializeVirtualEnv(settings, venv_path, executable):
+    """Tries to initialize a Python virtual environment using this specific
+    Python executable.
+
+    If this Python executable is not able to create a virtualenv then we
+    ignore this fact for the time being.
+    Later on the actual executable will get used instead of the
+    virtual environment.
+
+    Args:
+        settings (dict)      : dictionary holding all our settings
+        venv_path (string)   : absolute path to the virtual environment
+        executable (string)  : absolute path of the Python executable to use
+
     """
     venv_name = os.path.basename(venv_path)
-    venv_root = os.path.dirname(venv_path)
-    wrapper = _getWrapperPath(settings,
-                              name='setup_python_virtualenv')
 
-    args = [wrapper,
-            executable,
-            venv_name,
-            venv_root,
-            os.path.dirname(_getPathToMyself())]
+    args = [executable,
+            '-m',
+            'virtualenv',
+            venv_path]
 
     Popen = _resolvePopenClass()
-    with Popen(args=args,
-               bufsize=0,
-               shell=True,
-               stdout=subprocess.PIPE,
-               stderr=subprocess.STDOUT) as proc:
+    try:
         print('')
         print('/'*80)
         print("Initializing virtualenv '{}'".format(venv_name))
-        sys.stdout.flush()
-        while True:
-            line = proc.stdout.readline().decode('utf-8')
-            if not line:
-                break
-            sys.stdout.write(line)
-        proc.wait()
+
+        with Popen(args=args,
+                   bufsize=0,
+                   shell=True,
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.STDOUT) as proc:
+            sys.stdout.flush()
+            while True:
+                line = proc.stdout.readline().decode('utf-8')
+                if not line:
+                    break
+                sys.stdout.write(line)
+            proc.wait()
+
+    except Exception as e:
+        print('')
+        print('Failed with this exception: {}'.format(e))
+        print('')
+        print(traceback.format_exc())
+
+    finally:
         print('/'*80)
         print('')
+
+
+
+
+
+
+# -----------------------------------------------------------------------------
+def mayaScheduleDelayed():
+    """Schedule a delayed test suite run inside an interactive Maya session.
+
+    """
+    import maya.cmds as cmds
+
+    print('-----------------------------')
+    print('vfxtest: scheduleDelayed()')
+    print('-----------------------------')
+
+    myself = __file__.replace('\\', '/').replace('.pyc', '.py')
+
+    run_delayed = 'import maya.cmds as cmds;' \
+                  'import vfxtest;' \
+                  "cmds.evalDeferred('vfxtest.mayaRunDelayed()')".format(myself)
+
+    cmds.scriptJob(runOnce=True, event=['NewSceneOpened', run_delayed])
+    cmds.file(new=True, f=True)
+
+
+# -----------------------------------------------------------------------------
+def mayaRunDelayed():
+    """Run test suite inside an interactive Maya session.
+
+    """
+    import maya.cmds as cmds
+
+    print('-----------------------------')
+    print('vfxtest: runTestsDelayed()')
+    print('-----------------------------')
+    stats = runMain()
+    # don't quit if errors occured
+    if stats['errors'] == 0:
+        cmds.quit(f=True)
+
+
+# -----------------------------------------------------------------------------
+def houdiniScheduleDelayed():
+    """Schedule a delayed test suite run inside an interactive Houdini session.
+
+    """
+    import hdefereval
+
+    context = os.path.basename(sys.executable)
+    if context.lower().find('houdini') != -1:
+        hdefereval.executeDeferred(houdiniRunDelayed)
+
+
+# -----------------------------------------------------------------------------
+def houdiniRunDelayed():
+    """Run test suite inside an interactive Houdini session.
+
+    """
+    import hou
+
+    try:
+        runMain()
+        hou.exit(suppress_save_prompt=True)
+    except Exception as e:
+        hou.exit(error_code=1, suppress_save_prompt=True)
+
+
+
+
 
 
 # -----------------------------------------------------------------------------
@@ -1138,6 +1401,7 @@ class PopenWithContextManager(subprocess.Popen): # pragma: no cover_3
         finally:
             # Wait for the process to terminate, to avoid zombies.
             self.wait()
+
 
 # -----------------------------------------------------------------------------
 class FilteredTestLoader(unittest.TestLoader):

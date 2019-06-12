@@ -1,4 +1,4 @@
 # ignore coverage data and html reports
 .coverage*
 _html_coverage
-test_output
+vfxtest_output
