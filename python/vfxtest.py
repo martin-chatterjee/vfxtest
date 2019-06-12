@@ -26,8 +26,11 @@ provides you with combined code coverage metrics for all of them.
 """
 *** - rename output folder
 *** - derive 'ignore' from executable
+*** - remove colorama dependency
 - come up with workflow that works with a pip-installed vfxtest installation!
 - what's up with requirements.txt in mayapy/maya/hython/houdini/...?
+        --> create a pure-python lib folder ?!?
+            (coverage, mock, virtualenv)
         --> use lib/site-packages from python virtualenv?!?
 - keep it simple!
 - auto-generate wrapper scripts in subfolders(?!?)
@@ -54,9 +57,7 @@ except: # pragma: no cover_3
     import mock
 
 import coverage
-import colorama
 
-colorama.init()
 main = unittest.main
 
 
@@ -937,7 +938,7 @@ def _readConfig(settings):
 # -----------------------------------------------------------------------------
 def _logJsonError(cfg_path, e, lines):
     """Prints out a meaningful JSON error with correct line numbers and the
-    correct highlighted part of the offending JSON.
+    correct line-numbered part of the offending JSON.
 
     Args:
         cfg_path (string)   :   path to the config file
@@ -945,7 +946,7 @@ def _logJsonError(cfg_path, e, lines):
         lines (list)        :   json source lines (with stripped comments)
 
     """
-    offending_lineno = _extractLineNumber(e)
+    offending_line_nbr = _extractLineNumber(e)
 
     print('')
     print('')
@@ -955,7 +956,7 @@ def _logJsonError(cfg_path, e, lines):
     print('This cfg file does not contain valid JSON:')
     print("       '{}'".format(cfg_path))
     print('')
-    print("Error: '{}'".format(e))
+    print("Error in line {}: '{}'".format(offending_line_nbr, e))
     print('')
     print('Faulty JSON (after stripping comments):')
     print('---------------------------------------')
@@ -963,10 +964,7 @@ def _logJsonError(cfg_path, e, lines):
     for index, line in enumerate(lines):
         lineno = index+1
         source_line = '{}  {}'.format(str(lineno).rjust(3), line)
-        if lineno == offending_lineno:
-            _printHighlighted(source_line)
-        else:
-            print(source_line)
+        print(source_line)
     print('')
     print('='*80)
     print('')
@@ -983,27 +981,14 @@ def _extractLineNumber(e):
         (int)   : offending line number, or -1
 
     """
-    lineno = -1
+    line_nbr = -1
     try:
         right_side = str(e).split('line ')[1]
         number = right_side.split(' ')[0]
-        lineno = int(number)
+        line_nbr = int(number)
     except Exception as e:
         pass
-    return lineno
-
-
-# -----------------------------------------------------------------------------
-def _printHighlighted(line):
-    """Prints a highlighted line to STDOUT (white text on red background).
-
-    """
-    # uses the awesome colorama package
-    styled = '{}{}{}{}'.format(colorama.Fore.WHITE,
-                               colorama.Back.RED,
-                               line,
-                               colorama.Style.RESET_ALL)
-    print(styled)
+    return line_nbr
 
 
 # -------------------------------------------------------------------------
