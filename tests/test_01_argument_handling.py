@@ -11,6 +11,8 @@ except:
 
 import os
 import unittest
+import shutil
+import sys
 
 import vfxtest
 
@@ -94,8 +96,6 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         self.assertEqual(result_a, result_b)
 
-        os.rmdir('./vfxtest_output')
-
     # -------------------------------------------------------------------------
     def test05_collectSettings_invalid_boolean_string_raises_SystemExit(self):
 
@@ -120,23 +120,27 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test07_collectSettings_nonexistent_test_output_parent_folder_raises_SystemExit(self):
+    def test07_prepareEnvironment_nonexistent_test_output_parent_folder_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
-            result = vfxtest.collectSettings(['--cfg',
-                                              './test_output-non-existent-parent-folder.cfg'])
+            settings = vfxtest.collectSettings(['--cfg',
+                                                './test_output-non-existent-parent-folder.cfg'])
+            settings['test_no_pythonpath'] = True
+            vfxtest.prepareEnvironment(settings)
 
     # -------------------------------------------------------------------------
-    def test08_collectSettings_nonexistent_test_output_folder_gets_created(self):
+    def test08_prepareEnvironment_nonexistent_test_output_folder_gets_created(self):
 
         if os.path.exists('./remove_me'):
-            os.rmdir('./remove_me')
+            shutil.rmtree('./remove_me')
 
-        result = vfxtest.collectSettings(['--cfg',
-                                          './test_output-create-folder.cfg'])
+        settings = vfxtest.collectSettings(['--cfg',
+                                            './test_output-create-folder.cfg'])
+        settings['test_no_pythonpath'] = True
+        vfxtest.prepareEnvironment(settings,)
 
         self.assertTrue(os.path.exists('./remove_me'))
-        os.rmdir('./remove_me')
+        shutil.rmtree('./remove_me')
 
     # -------------------------------------------------------------------------
     def test09_collectSettings_falls_back_to_cfg_in_parent_folder(self):
@@ -181,7 +185,6 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         result_b['subprocess'] = None
         self.assertEqual(result_a, result_b)
 
-        os.rmdir('./vfxtest_output')
 
     # -------------------------------------------------------------------------
     def test11_collectSettings_invalid_cfg_file_prints_useful_error_and_raises_SystemExit(self):
@@ -205,6 +208,64 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
         result = vfxtest._extractLineNumber('Not a single line number in here...')
         self.assertEqual(result, -1)
+
+    # -------------------------------------------------------------------------
+    def test14_prepareEnvironment_without_python_contexts_still_preps_pythonpath_or_throws_EnvironmentError(self):
+
+        if os.path.exists('./no_python_contexts'):
+            shutil.rmtree('./no_python_contexts')
+
+        settings = vfxtest.collectSettings(['--cfg',
+                                            './test_no-python-contexts.cfg'])
+        # Python 2.x
+        if sys.version.startswith('2.'):
+            vfxtest.prepareEnvironment(settings)
+            proof = './no_python_contexts/_dcc_settings/PYTHONPATH/mock/mock.py'
+            self.assertTrue(os.path.exists(proof))
+
+        elif sys.version.startswith('3.'):
+            with self.assertRaises(EnvironmentError):
+                vfxtest.prepareEnvironment(settings)
+        else:
+            raise EnvironmentError('Python version not tested: {}'.format(sys.version))
+
+        shutil.rmtree('./no_python_contexts')
+
+    # -------------------------------------------------------------------------
+    def test15_copyModulesToFolder_works_as_expected(self):
+        if os.path.exists('./copy_modules'):
+            shutil.rmtree('./copy_modules')
+
+        os.makedirs('./copy_modules')
+        module_names = ['os', 'sqlite3',]
+
+        vfxtest._copyModulesToFolder(module_names, './copy_modules')
+
+        self.assertTrue(os.path.exists('./copy_modules/os.py'))
+        self.assertTrue(os.path.exists('./copy_modules/sqlite3/__init__.py'))
+
+        shutil.rmtree('./copy_modules')
+    # # -------------------------------------------------------------------------
+    # def test15_prepareEnvironment_swallows_any_internal_exception_on_virtualenv_prep(self):
+
+    #     if os.path.exists('./invalid_python_context'):
+    #         shutil.rmtree('./invalid_python_context')
+
+    #     settings = vfxtest.collectSettings(['--cfg',
+    #                                         './test_invalid-python-context.cfg'])
+    #     settings['test_no_pythonpath'] = True
+
+    #     details = {}
+    #     venv = os.path.abspath('./test_no_pythonpath/_dcc_settings/venv_invalid').replace('\\', '/')
+    #     executable = 'c:/does/not/exist/python.exe'
+    #     details[venv] = executable
+
+    #     # with mock.patch('vfxtest._collectPythonExecutableDetails', return_value=details):
+    #         # with mock.patch('os.path.exists', return_value=True):
+    #     vfxtest.prepareEnvironment(settings)
+    #     self.assertTrue(os.path.exists('./invalid_python_context'))
+
+    #     shutil.rmtree('./invalid_python_context')
 
 
 # -----------------------------------------------------------------------------

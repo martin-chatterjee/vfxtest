@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2019, Martin Chatterjee. All rights reserved.
@@ -8,6 +9,7 @@ import sys
 import platform
 import glob
 import unittest
+import shutil
 
 import coverage
 
@@ -21,8 +23,12 @@ def main(folder_path, failfast, print_to_stdout, include_test_files):
     sys.path.append(python)
     os.environ['PYTHONPATH'] = os.pathsep.join([test_sandbox, python])
 
+    # cleanup
+    if os.path.exists('./vfxtest_output'):
+        shutil.rmtree('./vfxtest_output')
+
     omit = []
-    if not include_test_files:
+    if include_test_files is False:
         omit.append('test*.py')
     # add support for Python major version 'no-cover' support:
     # --> no coverage on python 2.x:
