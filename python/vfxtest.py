@@ -31,6 +31,7 @@ import glob
 import importlib
 import inspect
 import json
+import logging
 import os
 import platform
 import shutil
@@ -48,6 +49,28 @@ import coverage
 
 main = unittest.main
 
+logger = logging.getLogger('vfxtest')
+"""vfxtest logger"""
+
+# -----------------------------------------------------------------------------
+def initLogging(level=logging.INFO,
+                format='%(name)s | %(levelname)s : %(message)s'):
+    """Initializes the vfxtest logger.
+
+    """
+    logger = logging.getLogger('vfxtest')
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+
+    console = logging.StreamHandler()
+    formatter = logging.Formatter(format)
+    console.setFormatter(formatter)
+    console.setLevel(level)
+    logger.addHandler(console)
+
+    # return logger
+
+initLogging()
 
 # -----------------------------------------------------------------------------
 def runMain(args=[]):
@@ -139,7 +162,7 @@ def runTestSuite(settings, report=True):
 
     Args:
         settings (dict)     :  dictionary holding all our settings
-        report (bool)       :  will print a coverage report to STDOUT, if True
+        report (bool)       :  will log the coverage report to STDOUT, if True
                                (default: True)
     Raises:
         (Exception)         : any internal exception will be re-raised
@@ -163,7 +186,7 @@ def runNative(settings, report=True, use_coverage=True):
 
     Args:
         settings (dict)     :  dictionary holding all our settings
-        report (bool)       :  will print a coverage report to STDOUT, if True
+        report (bool)       :  will log the coverage report to STDOUT, if True
                                (default: True)
         use_coverage (bool) :  will track coverage if True.
                                (default: True)
@@ -184,7 +207,7 @@ def runNative(settings, report=True, use_coverage=True):
     for item in suite:
         if (settings['limit'] > 0 and
                 settings['files_run'] >= settings['limit']):
-            print('Reached file limit... Stopping here...')
+            logger.info('Reached file limit... Stopping here...')
             break
 
         result = runner.run(item, settings=settings)
@@ -252,26 +275,26 @@ def runInSubprocess(settings, context):
         args.append('&&')
         args.append(deactivate)
 
-    print('')
-    print('/'*80)
+    logger.info('')
+    logger.info('/'*80)
     status_line = ("// Running tests in './{}' as a subprocess (context '{}'): "
                    .format(os.path.basename(settings['target']), context))
     status_line += '/'*(80-len(status_line))
-    print (status_line)
-    print('')
+    logger.info(status_line)
+    logger.info('')
     sys.stdout.flush()
 
     if settings['debug_mode']:
-        print('')
-        print('[DBG] target folder:')
-        print('      -------------')
-        print('      ' + ctxt_settings['target'])
-        print('')
-        print('[DBG] target context:')
-        print('      --------------')
-        print('      ' + ctxt_settings['context'])
-        print('')
-        print('')
+        logger.info('')
+        logger.info('[DBG] target folder:')
+        logger.info('      -------------')
+        logger.info('      ' + ctxt_settings['target'])
+        logger.info('')
+        logger.info('[DBG] target context:')
+        logger.info('      --------------')
+        logger.info('      ' + ctxt_settings['context'])
+        logger.info('')
+        logger.info('')
         sys.stdout.flush()
 
     Popen = _resolvePopenClass()
@@ -292,13 +315,13 @@ def runInSubprocess(settings, context):
         returncode = proc.wait()
 
     if settings['debug_mode']:
-        print('')
-        print('[DBG] --> Process Return Code: {}'
-               .format(returncode))
-        print('')
-        print('')
-        print ('/'*80)
-        print('')
+        logger.info('')
+        logger.info('[DBG] --> Process Return Code: {}'
+                     .format(returncode))
+        logger.info('')
+        logger.info('')
+        logger.info ('/'*80)
+        logger.info('')
         sys.stdout.flush()
 
 
@@ -309,8 +332,8 @@ def runInSubprocess(settings, context):
 
     # stop here on internal child process error
     if returncode != 0:
-            print("vfxtest ERROR: '{}' returned with error code {}. Stopping here..."
-                   .format(settings['context'], returncode))
+            logger.error("'{}' returned with error code {}. Stopping here..."
+                          .format(settings['context'], returncode))
             raise(SystemExit)
 
 
@@ -346,7 +369,6 @@ def runChildTestSuites(settings):
             if os.path.isdir(item_path):
                 child_settings['target'] = item_path
                 child_settings['context'] = item
-                print(child_settings['context'])
                 runTestSuite(child_settings)
 
     settings['files_run'] = child_settings['files_run']
@@ -370,11 +392,10 @@ def combineCoverages(settings):
     cov.combine()
     cov.save()
     try:
-        print('')
         cov.report()
         cov.html_report(directory='{}/_coverage_html'.format(test_output))
     except coverage.misc.CoverageException as e:
-        print('Coverage: no data to report')
+        logger.info('Coverage: no data to report')
 
 
 # -----------------------------------------------------------------------------
@@ -392,7 +413,7 @@ def encodeStatsIntoStdout(settings):
     encoded = '<vfxtest-stats>{}</vfxtest-stats>'.format(json.dumps(stats))
 
     stdout = sys.stdout
-    # let Maya print the stats to the _external_ stdout
+    # let Maya write the stats to the _external_ stdout
     # (console, not script editor)
     if settings['context'].lower() == 'maya':
         stdout = sys.__stdout__ # pragma: no cover
@@ -459,8 +480,9 @@ def initContext(settings):
             maya.standalone.initialize()
 
     except Exception as e:
-        print("initContext(): {}".format(e))
-        print(traceback.format_exc())
+        logger.error("initContext(): {}".format(e))
+        logger.exception(e)
+        # logger.exception(traceback.format_exc())
 
 
 # -----------------------------------------------------------------------------
@@ -551,8 +573,8 @@ def _compileSettings(arg_parser, args):
 
     except Exception as e:
         if not isinstance(e, ValueError):
-            print('Failed to read and conform config:\n{}\n{}'
-                   .format(e, traceback.format_exc()))
+            logger.error('Failed to read and conform config')
+            logger.error('{}\n{}'.format(e, traceback.format_exc()))
         raise SystemExit
 
     return settings
@@ -584,13 +606,13 @@ def _updateStatsFromStdout(settings, line):
         settings['tests_run'] = decoded['tests_run']
         settings['errors'] = decoded['errors']
 
-        print('')
-        print('Updated Stats -------------------------')
-        print(' {} test files run'.format(settings['files_run']))
-        print(' {} tests run'.format(settings['tests_run']))
-        print(' {} errors'.format(settings['errors']))
-        print('---------------------------------------')
-        print('')
+        logger.info('')
+        logger.info('Updated Stats -------------------------')
+        logger.info(' {} test files run'.format(settings['files_run']))
+        logger.info(' {} tests run'.format(settings['tests_run']))
+        logger.info(' {} errors'.format(settings['errors']))
+        logger.info('---------------------------------------')
+        logger.info('')
         sys.stdout.flush()
 
         status = True
@@ -814,10 +836,9 @@ def _stopCoverage(settings, cov, report=True):
     cov.save()
     if report:
         try:
-            print('')
             cov.report()
         except coverage.misc.CoverageException as e:
-            print('Coverage: no data to report')
+            logger.error('Coverage: no data to report')
 
 
 # -----------------------------------------------------------------------------
@@ -952,7 +973,7 @@ def _ensureDefaultSettings(settings):
 
 # -----------------------------------------------------------------------------
 def _logJsonError(cfg_path, e, lines):
-    """Prints out a meaningful JSON error with correct line numbers and the
+    """Logs a meaningful JSON error with correct line numbers and the
     correct line-numbered part of the offending JSON.
 
     Args:
@@ -963,26 +984,26 @@ def _logJsonError(cfg_path, e, lines):
     """
     offending_line_nbr = _extractLineNumber(e)
 
-    print('')
-    print('')
-    print('='*80)
-    print('= cfg Error ' + ('='*66))
-    print('')
-    print('This cfg file does not contain valid JSON:')
-    print("       '{}'".format(cfg_path))
-    print('')
-    print("Error in line {}: '{}'".format(offending_line_nbr, e))
-    print('')
-    print('Faulty JSON (after stripping comments):')
-    print('---------------------------------------')
-    print('')
+    logger.error('')
+    logger.error('')
+    logger.error('='*80)
+    logger.error('= cfg Error ' + ('='*68))
+    logger.error('')
+    logger.error('This cfg file does not contain valid JSON:')
+    logger.error("       '{}'".format(cfg_path))
+    logger.error('')
+    logger.error("Error in line {}: '{}'".format(offending_line_nbr, e))
+    logger.error('')
+    logger.error('Faulty JSON (after stripping comments):')
+    logger.error('---------------------------------------')
+    logger.error('')
     for index, line in enumerate(lines):
         lineno = index+1
         source_line = '{}  {}'.format(str(lineno).rjust(3), line)
-        print(source_line)
-    print('')
-    print('='*80)
-    print('')
+        logger.error(source_line)
+    logger.error('')
+    logger.error('='*80)
+    logger.error('')
 
 
 # -----------------------------------------------------------------------------
@@ -1360,9 +1381,9 @@ def _initializeVirtualEnv(settings, venv_path, executable):
            ]
 
     Popen = _resolvePopenClass()
-    print('')
-    print('/'*80)
-    print("Initializing virtualenv '{}'".format(venv_name))
+    logger.info('')
+    logger.info('/'*80)
+    logger.info("Initializing virtualenv '{}'".format(venv_name))
 
     with Popen(args=args,
                bufsize=0,
@@ -1377,8 +1398,8 @@ def _initializeVirtualEnv(settings, venv_path, executable):
             sys.stdout.write(line)
         proc.wait()
 
-    print('/'*80)
-    print('')
+    logger.info('/'*80)
+    logger.info('')
 
 
 # -----------------------------------------------------------------------------
@@ -1393,9 +1414,9 @@ def mayaScheduleDelayed(): # pragma: no cover
     """
     import maya.cmds as cmds
 
-    print('-----------------------------')
-    print('vfxtest: scheduleDelayed()')
-    print('-----------------------------')
+    logger.info('-----------------------------')
+    logger.info('vfxtest: scheduleDelayed()')
+    logger.info('-----------------------------')
 
     myself = __file__.replace('\\', '/').replace('.pyc', '.py')
 
@@ -1414,9 +1435,9 @@ def mayaRunDelayed(): # pragma: no cover
     """
     import maya.cmds as cmds
 
-    print('-----------------------------')
-    print('vfxtest: runTestsDelayed()')
-    print('-----------------------------')
+    logger.info('-----------------------------')
+    logger.info('vfxtest: runTestsDelayed()')
+    logger.info('-----------------------------')
     stats = runMain()
     # don't quit if errors occured
     if stats['errors'] == 0:
@@ -1645,7 +1666,7 @@ class TestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     @classmethod
     def setUpClass(cls, *args, **kwargs):
-        """Executes TestCase.setupClass, and also prints our test header.
+        """Executes TestCase.setupClass, and also logs our test header.
         """
         super(TestCase, cls).setUpClass(*args, **kwargs)
         cls.logHeader()
@@ -1653,12 +1674,12 @@ class TestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     @classmethod
     def logHeader(cls):
-        """Prints the test header.
+        """logs the test header.
         """
-        print('')
-        print('-' * 70)
-        print("    Running tests in '{}'".format(cls.__name__))
-        print('-' * 70)
+        logger.info('')
+        logger.info('-' * 70)
+        logger.info("    Running tests in '{}'".format(cls.__name__))
+        logger.info('-' * 70)
         sys.stdout.flush()
 
 
