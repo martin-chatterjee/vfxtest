@@ -95,7 +95,7 @@ def runMain(args=[]):
 
     """
     settings = collectSettings(args)
-    prepareEnvironment(settings)
+    prepareTestEnvironment(settings)
     runTestSuite(settings)
 
     if settings['subprocess'] is False:
@@ -127,7 +127,7 @@ def collectSettings(args=[]):
 
 
 # -----------------------------------------------------------------------------
-def prepareEnvironment(settings):
+def prepareTestEnvironment(settings):
     """Prepares the testing environment.
 
     First ensures that our output folder exists.
