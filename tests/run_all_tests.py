@@ -18,7 +18,7 @@ def main(folder_path, failfast, print_to_stdout, include_test_files):
     """
     """
     test_sandbox = os.path.abspath('./test_sandbox')
-    python = os.path.abspath('../python')
+    python = os.path.abspath('..')
     sys.path.append(test_sandbox)
     sys.path.append(python)
     os.environ['PYTHONPATH'] = os.pathsep.join([test_sandbox, python])

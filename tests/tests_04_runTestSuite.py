@@ -41,7 +41,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
     def test01_runTestSuite_native_runs_successfully(self):
 
         settings = vfxtest.collectSettings()
-        vfxtest.prepareEnvironment(settings)
+        vfxtest.prepareTestEnvironment(settings)
 
         vfxtest.runTestSuite(settings=settings)
 
@@ -53,7 +53,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
     def test02_runTestSuite_single_context_runs_successfully(self):
 
         settings = vfxtest.collectSettings()
-        vfxtest.prepareEnvironment(settings)
+        vfxtest.prepareTestEnvironment(settings)
 
         cov_file = os.path.abspath('{}/.coverage.python3.x'.format(settings['output_folder']))
         if os.path.exists(cov_file):
@@ -72,7 +72,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
     def test03_runTestSuite_nested_context_runs_successfully(self):
 
         settings = vfxtest.collectSettings()
-        vfxtest.prepareEnvironment(settings)
+        vfxtest.prepareTestEnvironment(settings)
 
         cov_file_3 = os.path.abspath('{}/.coverage.python3.x'.format(settings['output_folder']))
         if os.path.exists(cov_file_3):
@@ -95,7 +95,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
     # def test04_runTestSuite_wrapper_script_not_found_raises_OSError(self):
 
     #     settings = vfxtest.collectSettings()
-    #     vfxtest.prepareEnvironment(settings)
+    #     vfxtest.prepareTestEnvironment(settings)
 
     #     settings['context'] = 'context_without_wrapper_script'
 
@@ -107,7 +107,7 @@ class RunTestSuiteTestCase(unittest.TestCase):
     def test05_runTestSuite_raises_SystemExit_on_child_proc_exit_code_bigger_than_zero(self):
 
         settings = vfxtest.collectSettings()
-        vfxtest.prepareEnvironment(settings)
+        vfxtest.prepareTestEnvironment(settings)
 
         settings['context'] = 'python3.x'
         settings['debug_mode'] = True

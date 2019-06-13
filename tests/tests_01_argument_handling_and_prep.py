@@ -9,16 +9,17 @@ try:
 except:
     import mock
 
+import logging
 import os
-import unittest
 import shutil
 import sys
+import unittest
 
 import vfxtest
 
 
 # -----------------------------------------------------------------------------
-class ArgumentHandlingTestCase(unittest.TestCase):
+class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -120,16 +121,16 @@ class ArgumentHandlingTestCase(unittest.TestCase):
 
 
     # -------------------------------------------------------------------------
-    def test07_prepareEnvironment_nonexistent_test_output_parent_folder_raises_SystemExit(self):
+    def test07_prepareTestEnvironment_nonexistent_test_output_parent_folder_raises_SystemExit(self):
 
         with self.assertRaises(SystemExit):
             settings = vfxtest.collectSettings(['--cfg',
                                                 './test_output-non-existent-parent-folder.cfg'])
             settings['test_no_pythonpath'] = True
-            vfxtest.prepareEnvironment(settings)
+            vfxtest.prepareTestEnvironment(settings)
 
     # -------------------------------------------------------------------------
-    def test08_prepareEnvironment_nonexistent_test_output_folder_gets_created(self):
+    def test08_prepareTestEnvironment_nonexistent_test_output_folder_gets_created(self):
 
         if os.path.exists('./remove_me'):
             shutil.rmtree('./remove_me')
@@ -137,7 +138,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings(['--cfg',
                                             './test_output-create-folder.cfg'])
         settings['test_no_pythonpath'] = True
-        vfxtest.prepareEnvironment(settings,)
+        vfxtest.prepareTestEnvironment(settings,)
 
         self.assertTrue(os.path.exists('./remove_me'))
         shutil.rmtree('./remove_me')
@@ -210,7 +211,7 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertEqual(result, -1)
 
     # -------------------------------------------------------------------------
-    def test14_prepareEnvironment_without_python_contexts_still_preps_pythonpath_or_throws_EnvironmentError(self):
+    def test14_prepareTestEnvironment_without_python_contexts_still_preps_pythonpath_or_throws_EnvironmentError(self):
 
         if os.path.exists('./no_python_contexts'):
             shutil.rmtree('./no_python_contexts')
@@ -219,13 +220,13 @@ class ArgumentHandlingTestCase(unittest.TestCase):
                                             './test_no-python-contexts.cfg'])
         # Python 2.x
         if sys.version.startswith('2.'):
-            vfxtest.prepareEnvironment(settings)
+            vfxtest.prepareTestEnvironment(settings)
             proof = './no_python_contexts/_dcc_settings/PYTHONPATH/mock/mock.py'
             self.assertTrue(os.path.exists(proof))
 
         elif sys.version.startswith('3.'):
             with self.assertRaises(EnvironmentError):
-                vfxtest.prepareEnvironment(settings)
+                vfxtest.prepareTestEnvironment(settings)
         else:
             raise EnvironmentError('Python version not tested: {}'.format(sys.version))
 
@@ -245,27 +246,17 @@ class ArgumentHandlingTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists('./copy_modules/sqlite3/__init__.py'))
 
         shutil.rmtree('./copy_modules')
-    # # -------------------------------------------------------------------------
-    # def test15_prepareEnvironment_swallows_any_internal_exception_on_virtualenv_prep(self):
 
-    #     if os.path.exists('./invalid_python_context'):
-    #         shutil.rmtree('./invalid_python_context')
+    # -------------------------------------------------------------------------
+    def test16_initLogging(self):
 
-    #     settings = vfxtest.collectSettings(['--cfg',
-    #                                         './test_invalid-python-context.cfg'])
-    #     settings['test_no_pythonpath'] = True
+        logger = logging.getLogger('vfxtest')
+        vfxtest.initLogging(level=logging.DEBUG, format='PROOF: %(message)s')
+        logger.debug('Proof')
+        vfxtest.initLogging()
+        logger.debug('Not anymore...')
+        logger.info('Back to defaults')
 
-    #     details = {}
-    #     venv = os.path.abspath('./test_no_pythonpath/_dcc_settings/venv_invalid').replace('\\', '/')
-    #     executable = 'c:/does/not/exist/python.exe'
-    #     details[venv] = executable
-
-    #     # with mock.patch('vfxtest._collectPythonExecutableDetails', return_value=details):
-    #         # with mock.patch('os.path.exists', return_value=True):
-    #     vfxtest.prepareEnvironment(settings)
-    #     self.assertTrue(os.path.exists('./invalid_python_context'))
-
-    #     shutil.rmtree('./invalid_python_context')
 
 
 # -----------------------------------------------------------------------------

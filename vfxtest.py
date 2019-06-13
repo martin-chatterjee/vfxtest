@@ -57,20 +57,27 @@ def initLogging(level=logging.INFO,
                 format='%(name)s | %(levelname)s : %(message)s'):
     """Initializes the vfxtest logger.
 
+    Args:
+        level            : log level
+                           Optional, defaults to logging.INFO
+        format (string)  : tokenized string describing the log format
+                           Optional, defaults to:
+                           '%(name)s | %(levelname)s : %(message)s'
+
     """
     logger = logging.getLogger('vfxtest')
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
-
     console = logging.StreamHandler()
     formatter = logging.Formatter(format)
     console.setFormatter(formatter)
     console.setLevel(level)
+    logger.setLevel(level)
     logger.addHandler(console)
 
-    # return logger
 
 initLogging()
+
 
 # -----------------------------------------------------------------------------
 def runMain(args=[]):

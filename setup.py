@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+
 with open("README.md", "r") as f:
     long_description = f.read()
 
@@ -23,7 +24,9 @@ setup(
         'Issues'        : 'https://github.com/martin-chatterjee/vfxtest/issues',
     },
 
-    packages=find_packages(where='python'),
+    py_modules=[
+        'vfxtest',
+    ],
     scripts=[
         'bin/vfxtest.cmd',
         'bin/vfxtest',
