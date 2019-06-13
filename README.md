@@ -1,7 +1,6 @@
 # vfxtest
 
-[<p align="center">**How do I use this?**</p>](./USAGE.md)
-
+<br>
 
 ## What's this about?
 
@@ -9,6 +8,7 @@ This project is about **managing a test suite** for a **Python codebase**
 that is used in **multiple contexts**.
 
 **Common contexts found in a VFX production environment are:**
+
 * standalone **Python 2.7**
 * standalone **Python 3.x**
 * **embedded Python interpreters** inside **DCC's**:
@@ -43,6 +43,13 @@ presents the **combined code coverage** of all those tests.
 
 While starting to embrace **TDD** in a **VFX production environment** I had
 this need and did not find an obvious existing solution to it.
+<br><br>
+
+## Documentation
+
+Soon to be found on **vfxtest.readthedocs.com**. 
+
+Stay tuned... :)
 <br><br>
 
 ## 'Impostor Syndrome' Disclaimer
