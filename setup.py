@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 
 setup(
     name='vfxtest',
-    version='0.1.0',
+    version='0.2.0.dev',
     license='MIT',
 
     author='Martin Chatterjee',
