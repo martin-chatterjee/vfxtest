@@ -122,6 +122,20 @@ class RunNativeTestCase(unittest.TestCase):
         self.assertEqual(settings['tests_run'], 3)
         self.assertEqual(settings['errors'], 0)
 
+    # -------------------------------------------------------------------------
+    def test08_runNative_no_tests_at_all_does_not_try_to_report_coverage(self):
+        print('x'*80)
+        settings = vfxtest.collectSettings(['--target', './python'])
+        settings['filter_tokens'].append('does-not-get-matched')
+        vfxtest.prepareTestEnvironment(settings)
+
+        vfxtest.runNative(settings=settings)
+
+        print('WTF:  {}'.format(settings['tests_run']))
+        self.assertEqual(settings['files_run'], 0)
+        self.assertEqual(settings['tests_run'], 0)
+        self.assertEqual(settings['errors'], 0)
+
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':

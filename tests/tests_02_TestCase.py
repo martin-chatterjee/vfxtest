@@ -89,6 +89,10 @@ class TestCaseTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test07_test_root_sets_and_gets_class_variable(self):
 
+
+        vfxtest.TestCase.test_root = './lorem/ipsum'
+        self.assertEqual(vfxtest.TestCase.test_root, './lorem/ipsum')
+
         a = vfxtest.TestCase(test_run=True)
         b = vfxtest.TestCase(test_run=True)
 

@@ -39,6 +39,7 @@ import subprocess
 import sys
 import traceback
 import unittest
+from six import add_metaclass
 
 try:
     import unittest.mock as mock
@@ -54,15 +55,15 @@ logger = logging.getLogger('vfxtest')
 
 # -----------------------------------------------------------------------------
 def initLogging(level=logging.INFO,
-                format='%(name)s | %(levelname)s : %(message)s'):
+                format='%(message)s'):
     """Initializes the vfxtest logger.
 
     Args:
         level            : log level
                            Optional, defaults to logging.INFO
         format (string)  : tokenized string describing the log format
-                           Optional, defaults to:
-                           '%(name)s | %(levelname)s : %(message)s'
+                           Optional, defaults to plain message logging:
+                           '%(message)s'
 
     """
     logger = logging.getLogger('vfxtest')
@@ -107,6 +108,7 @@ def runMain(args=[]):
 
     if settings['subprocess'] is False:
         runChildTestSuites(settings)
+        logStats(settings)
         combineCoverages(settings)
 
     return getStats(settings)
@@ -218,16 +220,20 @@ def runNative(settings, report=True, use_coverage=True):
             break
 
         result = runner.run(item, settings=settings)
-        sys.stdout.flush()
+        sys.stderr.flush()
 
         settings['files_run'] += 1
         settings['tests_run'] += result.testsRun
         settings['errors'] += len(result.errors) + len(result.failures)
 
-    if use_coverage:
-        # --> can't be covered:
-        #     coverage does not work inside of another coverage run
-        _stopCoverage(settings, cov, report=report) # pragma: no cover
+
+    # --> can't be covered:
+    #     coverage does not work inside of another coverage run
+    if use_coverage: # pragma: no cover
+        report_here = not settings['subprocess']
+        if settings['tests_run'] == 0:
+            report_here = False
+        _stopCoverage(settings, cov, report=report_here)
 
     if settings['context'] != 'native':
         encodeStatsIntoStdout(settings)
@@ -509,7 +515,7 @@ def _defineArguments():
     parser.add_argument('-c', '--cfg', metavar='', type=str, default=None,
                         help="path of the .cfg file to use. "
                              ""
-                             "Defaults to 'vfxtest.cfg' in:"
+                             "Defaults to '.config' in:"
                              "    - the current working directory"
                              "    - the parent folder of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
@@ -613,14 +619,6 @@ def _updateStatsFromStdout(settings, line):
         settings['tests_run'] = decoded['tests_run']
         settings['errors'] = decoded['errors']
 
-        logger.info('')
-        logger.info('Updated Stats -------------------------')
-        logger.info(' {} test files run'.format(settings['files_run']))
-        logger.info(' {} tests run'.format(settings['tests_run']))
-        logger.info(' {} errors'.format(settings['errors']))
-        logger.info('---------------------------------------')
-        logger.info('')
-        sys.stdout.flush()
 
         status = True
 
@@ -629,6 +627,18 @@ def _updateStatsFromStdout(settings, line):
 
     return status
 
+# -----------------------------------------------------------------------------
+def logStats(settings):
+    """
+    """
+    logger.info('')
+    logger.info('vfxtest stats -------------------------')
+    logger.info(' {} test files run'.format(settings['files_run']))
+    logger.info(' {} tests run'.format(settings['tests_run']))
+    logger.info(' {} errors'.format(settings['errors']))
+    logger.info('---------------------------------------')
+    logger.info('')
+    sys.stdout.flush()
 
 
 # -----------------------------------------------------------------------------
@@ -840,12 +850,12 @@ def _stopCoverage(settings, cov, report=True):
     #     coverage does not work inside of another coverage run
     cov.stop() # pragma: no cover
 
+    if settings['tests_run'] == 0:
+        return
+
     cov.save()
     if report:
-        try:
-            cov.report()
-        except coverage.misc.CoverageException as e:
-            logger.error('Coverage: no data to report')
+        cov.report()
 
 
 # -----------------------------------------------------------------------------
@@ -877,7 +887,7 @@ def _readConfig(settings):
 
     Respects the path to a config file stored in the 'cfg' value of
     the settings dictionary.
-    Otherwise falls back to expecting 'vfxtest.cfg' in the current
+    Otherwise falls back to expecting '.config' in the current
     working directory, or its parent directory.
 
     The config file must contain valid JSON, but can also contain lines
@@ -890,14 +900,14 @@ def _readConfig(settings):
         (Exception)         : on Problems decoding JSON
 
     """
-    # prefer 'vfxtest.cfg' in current folder, fallback to parent folder
+    # prefer '.config' in current folder, fallback to parent folder
     explicit_cfg = True
     if settings['cfg'] is None:
         explicit_cfg = False
-        if os.path.exists('./vfxtest.cfg'):
-            settings['cfg'] = './vfxtest.cfg'
+        if os.path.exists('./.config'):
+            settings['cfg'] = './.config'
         else:
-            settings['cfg'] = '../vfxtest.cfg'
+            settings['cfg'] = '../.config'
     # read out cfg and strip comments
     content = ''
 
@@ -1233,6 +1243,7 @@ def _ensureRequirements(target_path, name='requirements.txt'):
     with open(file_path, 'w') as f:
         f.write('coverage >= 4.5\n')
         f.write('mock >= 3.0; python_version < "3.3"\n')
+        f.write('six\n')
 
 
 # -----------------------------------------------------------------------------
@@ -1611,13 +1622,36 @@ class TextTestRunner(unittest.TextTestRunner):
 
 
 # -----------------------------------------------------------------------------
+class TestCaseType(type):
+    """Metaclass for TestCase.
+
+    Needed to support 'TestCase.test_root'.
+
+    """
+
+    # -------------------------------------------------------------------------
+    @property
+    def test_root(cls):
+        """Gives access to the current test_root folder path inside
+        the TestCase.
+
+        """
+        return TestCase._test_root
+    # -------------------------------------------------------------------------
+    @test_root.setter
+    def test_root(cls, value):
+        TestCase._test_root = value
+
+
+# -----------------------------------------------------------------------------
+@add_metaclass(TestCaseType)
 class TestCase(unittest.TestCase):
     """TestCase that also provides easy access to associated data such
     as 'test_root',  'setttings' or 'context'.
 
     """
 
-    __test_root = None
+    _test_root = None
 
     # -------------------------------------------------------------------------
     def __init__(self, methodName='runTest', test_run=False,  *args, **kwargs):
@@ -1635,11 +1669,11 @@ class TestCase(unittest.TestCase):
         the TestCase.
 
         """
-        return TestCase.__test_root
+        return TestCase._test_root
     # -------------------------------------------------------------------------
     @test_root.setter
     def test_root(self, value):
-        TestCase.__test_root = value
+        TestCase._test_root = value
 
     # -------------------------------------------------------------------------
     @property
@@ -1677,6 +1711,33 @@ class TestCase(unittest.TestCase):
         """
         super(TestCase, cls).setUpClass(*args, **kwargs)
         cls.logHeader()
+        cls.setUpOnce()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def tearDownClass(cls, *args, **kwargs):
+        """Executes TestCase.tearDownClass as well as our own tearDownOnce.
+        """
+        super(TestCase, cls).tearDownClass(*args, **kwargs)
+        cls.tearDownOnce()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def setUpOnce(cls):
+        """Gets executed in setupClass.
+        Implement this method in your TestCase to setup things per Test Suite.
+
+        """
+        pass
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def tearDownOnce(cls):
+        """Gets executed in tearDownClass.
+        Implement this method in your TestCase to setup things per Test Suite.
+
+        """
+        pass
 
     # -------------------------------------------------------------------------
     @classmethod

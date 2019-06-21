@@ -65,7 +65,7 @@ class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
         self.assertEqual(result['target'], os.getcwd())
         self.assertEqual(result['failfast'], True)
         self.assertEqual(result['cfg'], os.sep.join([result['target'],
-                                                       'vfxtest.cfg']))
+                                                       '.config']))
         self.assertEqual(result['limit'], 0)
         self.assertEqual(result['filter_tokens'], [])
         self.assertEqual(result['cwd'], os.getcwd())
@@ -151,7 +151,7 @@ class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
         result = vfxtest.collectSettings([])
         self.assertEqual(result['cfg'], '{}{}{}'.format(cwd,
                                                           os.sep,
-                                                          'vfxtest.cfg'))
+                                                          '.config'))
         os.chdir('..')
 
     # -------------------------------------------------------------------------
