@@ -793,8 +793,10 @@ def _startCoverage(settings):
     omit = []
     # omit myself
     omit.append('*vfxtest.py')
-    # omit everythin in 'output_folder'
+    # omit everything in 'output_folder'
     omit.append('{}/*'.format(settings['output_folder']))
+    # respect 'omit_coverage' in config
+    omit.extend(settings.get('omit_coverage', []))
     # add omit_coverage tokens from config
     context = settings['context']
     context_details = settings.get('context_details', {}).get(context, {})
