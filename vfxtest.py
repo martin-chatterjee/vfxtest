@@ -96,13 +96,18 @@ def runMain(args=[]):
         args (list)     :   list of command line arguments. (optional)
 
     Returns:
-        (int)           :   statistics encoded into an 'exitcode' integer
+        (dict)           :   dictionary holding statistics
 
     Raises:
         (SystemExit)    :   on missing or incompatible settings or arguments
 
     """
     settings = collectSettings(args)
+
+    if settings['init']:
+        createSampleConfig(settings)
+        return getStats(settings)
+
     prepareTestEnvironment(settings)
     runTestSuite(settings)
 
@@ -506,6 +511,33 @@ def initContext(settings):
 
 
 # -----------------------------------------------------------------------------
+def createSampleConfig(settings):
+    """Creates a sample .config file in the current target folder.
+
+    Will not overwrite an already existing file.
+
+    Args:
+        settings (dict)     :  dictionary holding all our settings
+
+    Raises:
+        (SystemExit)    :   on invalid target or already existing config file
+
+    """
+    if not os.path.exists(settings['target']):
+        logger.error("'target' folder not accessible: {}".format(settings['target']))
+        raise SystemExit
+
+    config_path = '{}/.config'.format(settings['target'], )
+    if os.path.exists(config_path):
+        logger.error("config already exists: {}".format(config_path))
+        raise SystemExit
+
+    content = _getSampleConfigContent()
+    with open(config_path, 'w') as f:
+        f.write(content)
+
+
+# -----------------------------------------------------------------------------
 def _defineArguments():
     """Defines and documents the valid command line arguments.
 
@@ -515,6 +547,8 @@ def _defineArguments():
     """
     parser = argparse.ArgumentParser(description='Run test suite(s):')
 
+    parser.add_argument('-i', '--init', metavar='', type=str, default=False,
+                        help='initialises target folder by creating a sample .config file')
     parser.add_argument('-t', '--target', metavar='', type=str, default='.',
                         help='target folder path (defaults to current working directory)')
     parser.add_argument('-f', '--failfast', type=__stringToBool, default=True,
@@ -963,7 +997,7 @@ def _ensureDefaultSettings(settings):
     if not 'test_file_pattern' in settings:
         settings['test_file_pattern'] = 'test*.py'
     if not 'output_folder' in settings:
-        settings['output_folder'] = './vfxtest_output'
+        settings['output_folder'] = './.output'
 
     if not 'debug_mode' in settings:
         settings['debug_mode'] = False
@@ -1429,6 +1463,85 @@ def _initializeVirtualEnv(settings, venv_path, executable):
 
     logger.info('/'*80)
     logger.info('')
+
+
+# -----------------------------------------------------------------------------
+def _getSampleConfigContent():
+    """Returns the sample config content.
+
+    Returns:
+        (string) sample config content
+
+    """
+    content = """
+# -----------------------------------------------------------------------------
+# vfxtest config file
+# -----------------------------------------------------------------------------
+# (This is essentially just a json file that supports comments)
+
+{
+
+    # Define all contexts here that should be run.
+    #
+    # The context name should match with the subfolder name holding the tests.
+    # Nested Contexts are supported as well. In the below setup all tests in
+    # subfolder "python" would get run both in the "python2.x" and
+    # the "python3.x" context.
+    #
+    # - Adapt the "executables" and "versions" to your setup
+    # - Delete or comment out contexts not needed.
+    "context_details" :
+    {
+        # ---------------------------------------------------------------------
+        "python2.x" :
+        {
+            "executable" : "c:/python27/python.exe"
+        },
+        # ---------------------------------------------------------------------
+        "python3.x" :
+        {
+            "executable" : "c:/python37/python.exe"
+        },
+        # ---------------------------------------------------------------------
+        "python" :
+        {
+            "nested_contexts" :
+            [
+                "python3.x",
+                "python2.x"
+            ]
+        },
+
+
+        # ---------------------------------------------------------------------
+        "mayapy" :
+        {
+            "executable" : "C:/Program Files/Autodesk/Maya2018/bin/mayapy.exe",
+            "version" : "2018"
+        },
+        # ---------------------------------------------------------------------
+        "maya" :
+        {
+            "executable" : "C:/Program Files/Autodesk/Maya2018/bin/maya.exe",
+            "version" : "2018"
+        },
+        # ---------------------------------------------------------------------
+        "hython" :
+        {
+            "executable" : "C:/Program Files/Side Effects Software/Houdini 17.5.229/bin/hython.exe",
+            "version" : "17.5.229"
+        },
+        # ---------------------------------------------------------------------
+        "houdini" :
+        {
+            "executable" : "C:/Program Files/Side Effects Software/Houdini 17.5.229/bin/houdini.exe",
+            "version" : "17.5.229"
+        }
+    }
+}
+"""
+    return content
+
 
 
 # -----------------------------------------------------------------------------

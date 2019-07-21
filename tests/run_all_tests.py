@@ -24,8 +24,8 @@ def main(folder_path, failfast, print_to_stdout, include_test_files):
     os.environ['PYTHONPATH'] = os.pathsep.join([test_sandbox, python])
 
     # cleanup
-    if os.path.exists('./vfxtest_output'):
-        shutil.rmtree('./vfxtest_output')
+    if os.path.exists('./.output'):
+        shutil.rmtree('./.output')
 
     omit = []
     if include_test_files is False:

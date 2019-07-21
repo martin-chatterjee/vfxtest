@@ -19,6 +19,10 @@ class RunMainTestCase(unittest.TestCase):
     def setUpClass(cls):
         """
         """
+        cls.init_target = '{}/test_sandbox/init'.format(os.getcwd().replace('\\', '/'))
+        if not os.path.exists(cls.init_target):
+            os.makedirs(cls.init_target)
+
     # -------------------------------------------------------------------------
     @classmethod
     def tearDownClass(cls):
@@ -87,6 +91,27 @@ class RunMainTestCase(unittest.TestCase):
         settings['context'] = 'mayapy'
 
         vfxtest.initContext(settings)
+
+    # -------------------------------------------------------------------------
+    def test07_runMain_init_raises_SystemExit_on_already_existing_config(self):
+
+        with self.assertRaises(SystemExit):
+            proof = vfxtest.runMain(['--init', 'True'])
+
+    # -------------------------------------------------------------------------
+    def test08_runMain_init_raises_SystemExit_on_invalid_target(self):
+
+        with self.assertRaises(SystemExit):
+            proof = vfxtest.runMain(['--init', 'True', '--target', 'c:/in/va/lid'])
+
+    # -------------------------------------------------------------------------
+    def test09_runMain_init_creates_sample_config(self):
+
+        if os.path.exists('{}/.config'.format(self.init_target)):
+            os.remove('{}/.config'.format(self.init_target))
+        self.assertFalse(os.path.exists('{}/.config'.format(self.init_target)))
+        vfxtest.runMain(['--init', 'True', '--target', self.init_target])
+        self.assertTrue(os.path.exists('{}/.config'.format(self.init_target)))
 
 
 # -----------------------------------------------------------------------------
