@@ -190,7 +190,7 @@ def runNative(settings, report=True, use_coverage=True):
     """Runs the test suite found in 'target' natively in this current process.
 
     Locates all valid test files, filters them down by filter tokens and by
-    limit, then runs them.
+    'limit' and 'globallimit', then runs them.
     Tracks coverage, and updates statistics in 'settings'.
 
     Args:
@@ -212,12 +212,17 @@ def runNative(settings, report=True, use_coverage=True):
 
     runner = TextTestRunner(failfast=settings['failfast'],
                             buffer=False)
+
     # run tests file by file
     files_run_offset = settings['files_run'] * -1
     for item in suite:
+        if (settings['globallimit'] > 0 and
+                settings['files_run'] >= settings['globallimit']):
+            logger.info('Reached global file limit... Stopping here...')
+            break
         if (settings['limit'] > 0 and
                 (settings['files_run'] + files_run_offset) >= settings['limit']):
-            logger.info('Reached file limit... Stopping here...')
+            logger.info('Reached file limit per context... Stopping here...')
             break
 
         result = runner.run(item, settings=settings)
@@ -521,7 +526,9 @@ def _defineArguments():
                              "    - the current working directory"
                              "    - the parent folder of the current working directory")
     parser.add_argument('-l', '--limit', metavar='', type=int, default=0,
-                        help='limits the number of test files that get executed.')
+                        help='limits the number of test files per context that get executed.')
+    parser.add_argument('-gl', '--globallimit', metavar='', type=int, default=0,
+                        help='limits the total number of test files that get executed.')
     parser.add_argument('filter_tokens', nargs='*', type=str,
                         help='specify tokens that filter down the test files by name.')
 

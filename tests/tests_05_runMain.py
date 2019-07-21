@@ -47,9 +47,9 @@ class RunMainTestCase(unittest.TestCase):
         self.assertEqual(proof['errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test02_runMain_limit_works_as_expected(self):
+    def test02_runMain_globallimit_works_as_expected(self):
 
-        proof = vfxtest.runMain(['--limit', '2'])
+        proof = vfxtest.runMain(['--globallimit', '2'])
         self.assertEqual(proof['files_run'], 2)
         self.assertEqual(proof['tests_run'], 6)
         self.assertEqual(proof['errors'], 0)

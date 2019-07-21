@@ -9,7 +9,7 @@ import shutil
 
 import vfxtest
 
-
+from vfxtest import mock
 # -----------------------------------------------------------------------------
 class RunNativeTestCase(unittest.TestCase):
 
@@ -99,7 +99,19 @@ class RunNativeTestCase(unittest.TestCase):
         self.assertEqual(settings['context'], 'python2.x')
 
     # -------------------------------------------------------------------------
-    def test06_runNative_with_limit_works_as_expected(self):
+    def test06_runNative_with_globallimit_works_as_expected(self):
+
+        settings = vfxtest.collectSettings(['--globallimit', '1'])
+        vfxtest.prepareTestEnvironment(settings)
+
+        vfxtest.runNative(settings=settings, use_coverage=False)
+
+        self.assertEqual(settings['files_run'], 1)
+        self.assertEqual(settings['tests_run'], 3)
+        self.assertEqual(settings['errors'], 0)
+
+    # -------------------------------------------------------------------------
+    def test07_runNative_with_limit_works_as_expected(self):
 
         settings = vfxtest.collectSettings(['--limit', '1'])
         vfxtest.prepareTestEnvironment(settings)
@@ -111,7 +123,7 @@ class RunNativeTestCase(unittest.TestCase):
         self.assertEqual(settings['errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test07_runNative_in_subfolder_works_as_expected(self):
+    def test08_runNative_in_subfolder_works_as_expected(self):
 
         settings = vfxtest.collectSettings(['--target', './python'])
         vfxtest.prepareTestEnvironment(settings)
@@ -123,18 +135,32 @@ class RunNativeTestCase(unittest.TestCase):
         self.assertEqual(settings['errors'], 0)
 
     # -------------------------------------------------------------------------
-    def test08_runNative_no_tests_at_all_does_not_try_to_report_coverage(self):
-        print('x'*80)
+    def test09_runNative_no_tests_at_all_does_not_try_to_report_coverage(self):
+
         settings = vfxtest.collectSettings(['--target', './python'])
         settings['filter_tokens'].append('does-not-get-matched')
         vfxtest.prepareTestEnvironment(settings)
 
         vfxtest.runNative(settings=settings)
 
-        print('WTF:  {}'.format(settings['tests_run']))
         self.assertEqual(settings['files_run'], 0)
         self.assertEqual(settings['tests_run'], 0)
         self.assertEqual(settings['errors'], 0)
+
+    # -------------------------------------------------------------------------
+    def test10_runNative_with_failfast_stops_on_first_error(self):
+
+        settings = vfxtest.collectSettings(['--failfast', 'true'])
+        print(settings['failfast'])
+        print(settings['target'])
+
+        vfxtest.prepareTestEnvironment(settings)
+        with mock.patch('awesome_module.buzz', side_effect=Exception()):
+            vfxtest.runNative(settings=settings, use_coverage=False)
+
+        self.assertEqual(settings['files_run'], 1)
+        self.assertEqual(settings['tests_run'], 2)
+        self.assertEqual(settings['errors'], 1)
 
 
 # -----------------------------------------------------------------------------
