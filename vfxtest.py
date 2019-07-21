@@ -213,9 +213,10 @@ def runNative(settings, report=True, use_coverage=True):
     runner = TextTestRunner(failfast=settings['failfast'],
                             buffer=False)
     # run tests file by file
+    files_run_offset = settings['files_run'] * -1
     for item in suite:
         if (settings['limit'] > 0 and
-                settings['files_run'] >= settings['limit']):
+                (settings['files_run'] + files_run_offset) >= settings['limit']):
             logger.info('Reached file limit... Stopping here...')
             break
 
@@ -225,7 +226,8 @@ def runNative(settings, report=True, use_coverage=True):
         settings['files_run'] += 1
         settings['tests_run'] += result.testsRun
         settings['errors'] += len(result.errors) + len(result.failures)
-
+        if settings['failfast'] is True and settings['errors'] > 0:
+            break
 
     # --> can't be covered:
     #     coverage does not work inside of another coverage run
