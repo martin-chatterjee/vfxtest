@@ -730,6 +730,10 @@ def _preparePatchedEnvironment(settings, context):
     if env_var_value != '':
         tokens = env_var_value.split(os.pathsep)
     tokens.insert(0, cwd.replace('\\', '/'))
+    if 'PYTHONPATH' in settings:
+        tokens.append(str(settings['PYTHONPATH']))
+    if 'PYTHONPATH' in settings['context_details'][context]:
+        tokens.append(str(settings['context_details'][context]['PYTHONPATH']))
     env['PYTHONPATH'] = os.pathsep.join(tokens)
 
     dcc_pythonpath = '{}/PYTHONPATH'.format(dcc_settings)
@@ -1202,7 +1206,7 @@ def _preparePythonPath(settings):
     # is there a Python 2.x virtualenv that we can harvest?
     virtualenvs = _collectPythonExecutableDetails(settings)
     for env in virtualenvs:
-        executable = virtualenvs[env]
+        executable = virtualenvs[env]['executable']
         if _getPythonVersion(executable).startswith('2.'):
             source = '{}/Lib/site-packages'.format(env)
             _copyFolderContentToFolder(source, pythonpath)
@@ -1356,8 +1360,9 @@ def _ensureVirtualEnvs(settings):
 
     for venv_path in virtualenvs:
         if not os.path.exists(venv_path):
-            executable = virtualenvs[venv_path]
-            _initializeVirtualEnv(settings, venv_path, executable)
+            details = virtualenvs[venv_path]
+            dcc_settings_path = settings['dcc_settings_path']
+            _initializeVirtualEnv(venv_path, details, dcc_settings_path)
 
 
 # -----------------------------------------------------------------------------
@@ -1372,7 +1377,7 @@ def _getPythonVersion(executable):
 
 # -----------------------------------------------------------------------------
 def _collectPythonExecutableDetails(settings):
-    """Extracts details of all  python executables specified in
+    """Extracts details of all python executables specified in
     context_details.
 
     Verifies that those executables exist. Prepares the corresponding
@@ -1396,15 +1401,15 @@ def _collectPythonExecutableDetails(settings):
             if os.path.exists(executable):
                 venv_name = 'virtualenv_{}'.format(context)
                 venv_path = '{}/{}'.format(dcc_settings_path, venv_name)
-                result[venv_path] = executable
+                result[venv_path] = details
 
     return result
 
 
 # -----------------------------------------------------------------------------
-def _initializeVirtualEnv(settings, venv_path, executable):
+def _initializeVirtualEnv(venv_path, details, dcc_settings_path):
     """Tries to initialize a Python virtual environment using this specific
-    Python executable.
+    Python executable specified in the context details.
 
     If this Python executable is not able to create a virtualenv then we
     ignore this fact for the time being.
@@ -1412,12 +1417,14 @@ def _initializeVirtualEnv(settings, venv_path, executable):
     virtual environment.
 
     Args:
-        settings (dict)      : dictionary holding all our settings
-        venv_path (string)   : absolute path to the virtual environment
-        executable (string)  : absolute path of the Python executable to use
+        venv_path (string)         : absolute path to the virtual environment
+        details (dict)             : dict holding all settings for this context
+        dcc_settings_path (string) : absolute path toe the dcc_settings_path
+
 
     """
-    requirements = '{}/helpers/requirements.txt'.format(settings['dcc_settings_path'])
+    requirements = '{}/helpers/requirements.txt'.format(dcc_settings_path)
+    executable = details['executable']
 
     venv_name = os.path.basename(venv_path)
     subfolder = 'bin'
@@ -1438,10 +1445,20 @@ def _initializeVirtualEnv(settings, venv_path, executable):
             'install',
             '-r',
             requirements,
-            '&&',
-            keyword,
-            '{}/{}/deactivate'.format(venv_path, subfolder),
            ]
+    # deal with optional requirements file
+    if 'requirements' in details:
+        req_path = os.path.abspath(details['requirements']).replace('\\', '/')
+        if os.path.exists(req_path):
+            args.append('&&')
+            args.append('pip')
+            args.append('install')
+            args.append('-r')
+            args.append(req_path)
+    # finaly deactivate the virtualenv straight away
+    args.append('&&')
+    args.append(keyword)
+    args.append('{}/{}/deactivate'.format(venv_path, subfolder))
 
     Popen = _resolvePopenClass()
     logger.info('')
