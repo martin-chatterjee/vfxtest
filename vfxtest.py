@@ -331,7 +331,7 @@ def runInSubprocess(settings, context):
                env=env) as proc:
         sys.stdout.flush()
         while True:
-            line = proc.stdout.readline().decode('utf-8')
+            line = proc.stdout.readline()
             if not line:
                 break
             if not _updateStatsFromStdout(settings, line):
