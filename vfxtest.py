@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019, Martin Chatterjee. All rights reserved.
+# Copyright (c) 2019-2021, Martin Chatterjee. All rights reserved.
 # Licensed under MIT License (--> LICENSE.txt)
 # -----------------------------------------------------------------------------
 
@@ -267,8 +267,8 @@ def runInSubprocess(settings, context):
     ctxt_settings = copy.deepcopy(settings)
     ctxt_settings['context'] = context
 
-    env = _preparePatchedEnvironment(ctxt_settings, context)
     executable = _getExecutable(ctxt_settings)
+    env = _preparePatchedEnvironment(ctxt_settings, executable, context)
     vfxtest_py = _getPathToMyself()
     args = [executable, ]
     is_maya = False
@@ -290,15 +290,6 @@ def runInSubprocess(settings, context):
 
     else:
         args.append(vfxtest_py)
-
-    # deal with virtualenv activation and deactivation
-    if executable.find('virtualenv_{}'.format(context)) != -1:
-        activate = os.sep.join([os.path.dirname(executable), 'activate'])
-        deactivate = os.sep.join([os.path.dirname(executable), 'deactivate'])
-        args.insert(0, activate)
-        args.insert(1, '&&')
-        args.append('&&')
-        args.append(deactivate)
 
     logger.info('')
     logger.info('/'*80)
@@ -335,7 +326,7 @@ def runInSubprocess(settings, context):
             if not line:
                 break
             if not _updateStatsFromStdout(settings, line):
-                sys.stdout.write(line)
+                sys.stdout.write(str(line))
                 sys.stdout.flush()
         returncode = proc.wait()
 
@@ -420,7 +411,8 @@ def combineCoverages(settings):
         cov.report()
         cov.html_report(directory='{}/_coverage_html'.format(test_output))
     except coverage.misc.CoverageException as e:
-        logger.info('Coverage: no data to report')
+        logger.info('Coverage Exception: {}'.format(e))
+        logger.info(traceback.format_exc())
 
 
 # -----------------------------------------------------------------------------
@@ -704,12 +696,15 @@ def _resolveContextsToRun(settings):
 
 
 # -----------------------------------------------------------------------------
-def _preparePatchedEnvironment(settings, context):
+def _preparePatchedEnvironment(settings, executable, context):
     """Creates a duplicate of the current environment and patches all
     relevant environment variables for this context.
 
+    If a python virtual environment gets detected it will get activated.
+
     Args:
         settings (dict)      : dictionary holding all our settings
+        executable (string)  : path to resolved executable
         context (string)     : context to prepare the env for
 
     Returns:
@@ -731,12 +726,28 @@ def _preparePatchedEnvironment(settings, context):
         tokens = env_var_value.split(os.pathsep)
     tokens.insert(0, cwd.replace('\\', '/'))
     if 'PYTHONPATH' in settings:
-        tokens.append(str(settings['PYTHONPATH']))
+        tokens.append(os.path.abspath(str(settings['PYTHONPATH'])))
     if 'PYTHONPATH' in settings['context_details'][context]:
-        tokens.append(str(settings['context_details'][context]['PYTHONPATH']))
+        pythonpath = str(settings['context_details'][context]['PYTHONPATH'])
+        tokens.append(os.path.abspath(pythonpath))
     env['PYTHONPATH'] = os.pathsep.join(tokens)
 
     dcc_pythonpath = '{}/PYTHONPATH'.format(dcc_settings)
+
+    # if this is a python virtual environment, activate it
+    exe_folder = os.path.dirname(executable)
+    exe_name = os.path.basename(executable).lower().replace('.exe', '')
+    if exe_name == 'python':
+        expected_name = 'bin'
+        if sys.platform == 'win32':
+            expected_name = 'scripts'
+        if os.path.basename(exe_folder).lower() == expected_name:
+            venv_root = os.path.dirname(exe_folder)
+            env['VIRTUAL_ENV'] = str(venv_root)
+            if 'PYTHONHOME' in env:
+                env.pop('PYTHONHOME')
+            env['PATH'] = '{}{}{}'.format(exe_folder, os.pathsep, env['PATH'])
+
 
     # deal with maya contexts
     context = settings.get('context', '')
@@ -787,6 +798,7 @@ def _getExecutable(settings):
     if context.lower().find('python') != -1:
         dcc_settings = settings['dcc_settings_path']
         venv_root = os.sep.join([dcc_settings, 'virtualenv_{}'.format(context)])
+        venv_root = venv_root.replace('\\', '/')
         if os.path.exists(venv_root):
             subfolder = 'bin'
             if sys.platform == 'win32':
