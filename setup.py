@@ -35,6 +35,7 @@ setup(
         'virtualenv',
         'coverage >= 4.5',
         'mock >= 3.0; python_version < "3.3"',
+        'six',
     ],
 
     classifiers=[
