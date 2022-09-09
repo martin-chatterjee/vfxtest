@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 
 setup(
     name='vfxtest',
-    version='0.2.0',
+    version='0.2.1',
     license='MIT',
 
     author='Martin Chatterjee',
@@ -35,6 +35,7 @@ setup(
         'virtualenv',
         'coverage >= 4.5',
         'mock >= 3.0; python_version < "3.3"',
+        'six',
     ],
 
     classifiers=[
