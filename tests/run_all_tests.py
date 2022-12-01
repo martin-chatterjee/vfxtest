@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019, Martin Chatterjee. All rights reserved.
+# Copyright (c) 2019-2022, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
 import os
