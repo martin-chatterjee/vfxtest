@@ -1,0 +1,64 @@
+# -----------------------------------------------------------------------------
+# vfxtest config file, including DCC tests.
+#
+# → Please adjust DCC paths and versions, if necessary.
+# -----------------------------------------------------------------------------
+# (This is essentially just a json file that supports comments)
+
+{
+    "output_folder" : "../.output",
+
+    "debug_mode" : false,
+    "PYTHONPATH" : "./custom_pythonpath",
+
+    # --------------------------------
+    "context_details" :
+    {
+        # ----------------------------
+        "python2.x" :
+        {
+            "executable" : "c:/python27/python.exe",
+            "PYTHONPATH" : "./custom_pythonpath",
+            "requirements" : "./test_requirements.txt"
+        },
+        # ----------------------------
+        "python3.x" :
+        {
+            "executable" : "c:/python37/python.exe"
+        },
+        # ----------------------------
+        "python" :
+        {
+            "nested_contexts" :
+            [
+                "python3.x",
+                "python2.x"
+            ]
+        }
+        ,
+        # ----------------------------
+        "mayapy" :
+        {
+            "executable" : "C:/Program Files/Autodesk/Maya2022/bin/mayapy.exe",
+            "version" : "2022"
+        },
+        # ----------------------------
+        "maya" :
+        {
+            "executable" : "C:/Program Files/Autodesk/Maya2022/bin/maya.exe",
+            "version" : "2022"
+        },
+        # ----------------------------
+        "hython" :
+        {
+            "executable" : "C:/Program Files/Side Effects Software/Houdini 19.0.622/bin/hython.exe",
+            "version" : "19.0.622"
+        },
+        # ----------------------------
+        "houdini" :
+        {
+            "executable" : "C:/Program Files/Side Effects Software/Houdini 19.0.622/bin/houdini.exe",
+            "version" : "19.0.622"
+        }
+    }
+}
