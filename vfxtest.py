@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019-2021, Martin Chatterjee. All rights reserved.
+# Copyright (c) 2019-2022, Martin Chatterjee. All rights reserved.
 # Licensed under MIT License (--> LICENSE.txt)
 # -----------------------------------------------------------------------------
 
@@ -322,7 +322,7 @@ def runInSubprocess(settings, context):
                env=env) as proc:
         sys.stdout.flush()
         while True:
-            line = proc.stdout.readline()
+            line = proc.stdout.readline().decode()
             if not line:
                 break
             if not _updateStatsFromStdout(settings, line):
@@ -744,8 +744,7 @@ def _preparePatchedEnvironment(settings, executable, context):
         if os.path.basename(exe_folder).lower() == expected_name:
             venv_root = os.path.dirname(exe_folder)
             env['VIRTUAL_ENV'] = str(venv_root)
-            if 'PYTHONHOME' in env:
-                env.pop('PYTHONHOME')
+            env.pop('PYTHONHOME', None)
             env['PATH'] = '{}{}{}'.format(exe_folder, os.pathsep, env['PATH'])
 
 
@@ -897,7 +896,7 @@ def _startCoverage(settings):
 
 
 # -----------------------------------------------------------------------------
-def _stopCoverage(settings, cov, report=True):
+def _stopCoverage(settings, cov, report=True): # pragma: no cover
     """Stops the code coverage.
 
     Args:
@@ -907,9 +906,8 @@ def _stopCoverage(settings, cov, report=True):
                           (Optional, defaults to True)
 
     """
-    # --> 'cov.stop()' can't be covered:
-    #     coverage does not work inside of another coverage run
-    cov.stop() # pragma: no cover
+    #  → Coverage does not work inside of another coverage run.
+    cov.stop()
 
     if settings['tests_run'] == 0:
         return

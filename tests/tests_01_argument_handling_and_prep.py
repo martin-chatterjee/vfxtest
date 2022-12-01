@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019, Martin Chatterjee. All rights reserved.
+# Copyright (c) 2019-2022, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
 import json
@@ -16,6 +16,8 @@ import sys
 import unittest
 
 import vfxtest
+
+from output_trap import OutputTrap
 
 
 # -----------------------------------------------------------------------------
@@ -47,14 +49,16 @@ class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test01_collectSettings_help_raises_SystemError(self):
 
-        with self.assertRaises(SystemExit):
-            result = vfxtest.collectSettings(['--help'])
+        with OutputTrap():
+            with self.assertRaises(SystemExit):
+                result = vfxtest.collectSettings(['--help'])
 
     # -------------------------------------------------------------------------
     def test02_collectSettings_unknown_argument_raises_SystemError(self):
 
-        with self.assertRaises(SystemExit):
-            result = vfxtest.collectSettings(['--doesnotexist'])
+        with OutputTrap():
+            with self.assertRaises(SystemExit):
+                result = vfxtest.collectSettings(['--doesnotexist'])
 
     # -------------------------------------------------------------------------
     def test03_collectSettings_returns_default_args(self):
@@ -110,8 +114,9 @@ class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
             result = vfxtest.collectSettings(['--failfast', item])
             self.assertEqual(result['failfast'], False)
 
-        with self.assertRaises(SystemExit):
-            result = vfxtest.collectSettings(['--failfast', 'Nope'])
+        with OutputTrap():
+            with self.assertRaises(SystemExit):
+                result = vfxtest.collectSettings(['--failfast', 'Nope'])
 
     # -------------------------------------------------------------------------
     def test06_collectSettings_nonexistent_cfg_file_raises_SystemExit(self):
@@ -252,10 +257,9 @@ class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
 
         logger = logging.getLogger('vfxtest')
         vfxtest.initLogging(level=logging.DEBUG, format='PROOF: %(message)s')
-        logger.debug('Proof')
+        self.assertEqual(vfxtest.logger.level, logging.DEBUG)
         vfxtest.initLogging()
-        logger.debug('Not anymore...')
-        logger.info('Back to defaults')
+        self.assertEqual(vfxtest.logger.level, logging.INFO)
 
 
 
