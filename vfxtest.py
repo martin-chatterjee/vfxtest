@@ -896,7 +896,7 @@ def _startCoverage(settings):
 
 
 # -----------------------------------------------------------------------------
-def _stopCoverage(settings, cov, report=True):
+def _stopCoverage(settings, cov, report=True): # pragma: no cover
     """Stops the code coverage.
 
     Args:
@@ -906,9 +906,8 @@ def _stopCoverage(settings, cov, report=True):
                           (Optional, defaults to True)
 
     """
-    # --> 'cov.stop()' can't be covered:
-    #     coverage does not work inside of another coverage run
-    cov.stop() # pragma: no cover
+    #  → Coverage does not work inside of another coverage run.
+    cov.stop()
 
     if settings['tests_run'] == 0:
         return
