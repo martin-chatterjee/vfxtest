@@ -44,12 +44,14 @@ def main(folder_path, test_dccs, fail_fast, log_output, cover_testfiles):
     cov.exclude(versioned_exclude, which='exclude')
     cov.start()
 
-    # discover all tests and run them
-    loader = unittest.TestLoader()
-    suite = loader.discover(folder_path)
+    # Disable all OutputTraps, if necessary.
+    if log_output:
+        import output_trap
+        output_trap.BYPASS = log_output
 
-    runner = unittest.TextTestRunner(failfast=failfast,
-                                     buffer=(not print_to_stdout))
+    # Prepare and configure.
+    loader = unittest.TestLoader()
+    runner = unittest.TextTestRunner(failfast=fail_fast, buffer=(not log_output))
 
     result = runner.run(suite)
 
