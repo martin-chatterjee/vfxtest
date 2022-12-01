@@ -53,8 +53,14 @@ def main(folder_path, test_dccs, fail_fast, log_output, cover_testfiles):
     loader = unittest.TestLoader()
     runner = unittest.TextTestRunner(failfast=fail_fast, buffer=(not log_output))
 
-    result = runner.run(suite)
+    # Discover and run main test suite.
+    suite = loader.discover(folder_path, pattern='test*.py')
+    runner.run(suite)
 
+    # Discover and tests requiring DCC licenses.
+    if test_dccs is True:
+        dcc_suite = loader.discover(folder_path, pattern='dcc_test*.py')
+        runner.run(dcc_suite)
     cov.stop()
     cov.save()
     cov.report()
