@@ -744,8 +744,7 @@ def _preparePatchedEnvironment(settings, executable, context):
         if os.path.basename(exe_folder).lower() == expected_name:
             venv_root = os.path.dirname(exe_folder)
             env['VIRTUAL_ENV'] = str(venv_root)
-            if 'PYTHONHOME' in env:
-                env.pop('PYTHONHOME')
+            env.pop('PYTHONHOME', None)
             env['PATH'] = '{}{}{}'.format(exe_folder, os.pathsep, env['PATH'])
 
 
