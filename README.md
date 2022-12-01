@@ -2,6 +2,8 @@
 
 <br>
 
+[→ Release Notes](release-notes.md)
+
 ## What's this about?
 
 This project is about **managing a test suite** for a **Python codebase**
