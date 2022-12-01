@@ -7,6 +7,8 @@
     - Added **command line argument** handling.
     - Separated tests that require interactive DCC licenses.
     - Cleaned up console output by hiding internal logging.
+    - Made `run_all_tests.py` fully Python 3.x compatible.
+
 <br>
 
 ## `0.2.1` (09-Sep-2022)
