@@ -11,6 +11,9 @@ import json
 import vfxtest
 mock = vfxtest.mock
 
+from output_trap import OutputTrap
+
+
 # -----------------------------------------------------------------------------
 class RunMainTestCase(unittest.TestCase):
 
@@ -44,7 +47,8 @@ class RunMainTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test01_runMain_filtered_works_as_expected(self):
 
-        proof = vfxtest.runMain(['01', '03'])
+        with OutputTrap():
+            proof = vfxtest.runMain(['01', '03'])
 
         self.assertEqual(proof['files_run'], 3)
         self.assertEqual(proof['tests_run'], 9)
@@ -53,7 +57,8 @@ class RunMainTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test02_runMain_globallimit_works_as_expected(self):
 
-        proof = vfxtest.runMain(['--globallimit', '2'])
+        with OutputTrap():
+            proof = vfxtest.runMain(['--globallimit', '2'])
         self.assertEqual(proof['files_run'], 2)
         self.assertEqual(proof['tests_run'], 6)
         self.assertEqual(proof['errors'], 0)
@@ -61,7 +66,8 @@ class RunMainTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test03_runMain_with_empty_filtered_result_works_as_expected(self):
 
-        proof = vfxtest.runMain(['asdfg',])
+        with OutputTrap():
+            proof = vfxtest.runMain(['asdfg',])
         self.assertEqual(proof['files_run'], 0)
         self.assertEqual(proof['tests_run'], 0)
         self.assertEqual(proof['errors'], 0)
@@ -69,9 +75,10 @@ class RunMainTestCase(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test04_runMain_works_as_expected(self):
 
-        proof = vfxtest.runMain()
-        self.assertEqual(proof['files_run'], 7)
-        self.assertEqual(proof['tests_run'], 21)
+        with OutputTrap():
+            proof = vfxtest.runMain()
+        self.assertEqual(proof['files_run'], 4)  # 7
+        self.assertEqual(proof['tests_run'], 12) # 21
         self.assertEqual(proof['errors'], 0)
 
     # -------------------------------------------------------------------------
