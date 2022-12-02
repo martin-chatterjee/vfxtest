@@ -1849,6 +1849,9 @@ class TestCase(unittest.TestCase):
 
 
 # -----------------------------------------------------------------------------
-if __name__ == '__main__':
-    runMain(sys.argv[1:]) # pragma: no cover
+def main(): # pragma: no cover
+    runMain(sys.argv[1:])
 
+# -----------------------------------------------------------------------------
+if __name__ == '__main__':
+    main() # pragma: no cover
