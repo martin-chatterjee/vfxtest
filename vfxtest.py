@@ -1231,9 +1231,7 @@ def _ensureRequirements(target_path, name='requirements.txt'):
     file_path = '{}/{}'.format(target_path, name)
 
     with open(file_path, 'w') as f:
-        f.write('coverage >= 4.5\n')
-        f.write('mock >= 3.0; python_version < "3.3"\n')
-        f.write('six\n')
+        f.write('vfxtest=={}\n'.format(__version__))
 
 
 # -----------------------------------------------------------------------------
