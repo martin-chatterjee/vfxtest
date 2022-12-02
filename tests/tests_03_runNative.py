@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019, Martin Chatterjee. All rights reserved.
+# Copyright (c) 2019-2022, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
 import unittest
@@ -10,6 +10,10 @@ import shutil
 import vfxtest
 
 from vfxtest import mock
+
+from output_trap import OutputTrap
+
+
 # -----------------------------------------------------------------------------
 class RunNativeTestCase(unittest.TestCase):
 
@@ -46,7 +50,9 @@ class RunNativeTestCase(unittest.TestCase):
         cov_file = os.path.abspath('{}/.coverage.native'.format(settings['output_folder']))
         if os.path.exists(cov_file):
             os.remove(cov_file)
-        vfxtest.runNative(settings=settings, use_coverage=True)
+
+        with OutputTrap():
+            vfxtest.runNative(settings=settings, use_coverage=True)
 
         self.assertEqual(settings['files_run'], 2)
         self.assertEqual(settings['tests_run'], 6)
@@ -59,7 +65,9 @@ class RunNativeTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings(['--target', '.', '_01',])
         vfxtest.prepareTestEnvironment(settings)
 
-        vfxtest.runNative(settings=settings, use_coverage=False)
+        with OutputTrap():
+            vfxtest.runNative(settings=settings, use_coverage=False)
+
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 3)
         self.assertEqual(settings['errors'], 0)
@@ -71,13 +79,17 @@ class RunNativeTestCase(unittest.TestCase):
         vfxtest.prepareTestEnvironment(settings)
 
         settings['context'] = 'differentContext'
-        vfxtest.runNative(settings=settings)
+
+        with OutputTrap():
+            vfxtest.runNative(settings=settings)
+
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 3)
         self.assertTrue(os.path.exists('{}/.coverage.differentContext'.format(settings['output_folder'])))
 
-        settings = vfxtest.collectSettings()
-        vfxtest.combineCoverages(settings)
+        with OutputTrap():
+            settings = vfxtest.collectSettings()
+            vfxtest.combineCoverages(settings)
 
         self.assertFalse(os.path.exists('{}/.coverage.differentContext'.format(settings['output_folder'])))
         self.assertTrue(os.path.exists('{}/.coverage'.format(settings['output_folder'])))
@@ -104,7 +116,8 @@ class RunNativeTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings(['--globallimit', '1'])
         vfxtest.prepareTestEnvironment(settings)
 
-        vfxtest.runNative(settings=settings, use_coverage=False)
+        with OutputTrap():
+            vfxtest.runNative(settings=settings, use_coverage=False)
 
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 3)
@@ -116,7 +129,8 @@ class RunNativeTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings(['--limit', '1'])
         vfxtest.prepareTestEnvironment(settings)
 
-        vfxtest.runNative(settings=settings, use_coverage=False)
+        with OutputTrap():
+            vfxtest.runNative(settings=settings, use_coverage=False)
 
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 3)
@@ -128,7 +142,8 @@ class RunNativeTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings(['--target', './python'])
         vfxtest.prepareTestEnvironment(settings)
 
-        vfxtest.runNative(settings=settings)
+        with OutputTrap():
+            vfxtest.runNative(settings=settings)
 
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 3)
@@ -141,7 +156,8 @@ class RunNativeTestCase(unittest.TestCase):
         settings['filter_tokens'].append('does-not-get-matched')
         vfxtest.prepareTestEnvironment(settings)
 
-        vfxtest.runNative(settings=settings)
+        with OutputTrap():
+            vfxtest.runNative(settings=settings)
 
         self.assertEqual(settings['files_run'], 0)
         self.assertEqual(settings['tests_run'], 0)
@@ -151,12 +167,11 @@ class RunNativeTestCase(unittest.TestCase):
     def test10_runNative_with_failfast_stops_on_first_error(self):
 
         settings = vfxtest.collectSettings(['--failfast', 'true'])
-        print(settings['failfast'])
-        print(settings['target'])
 
         vfxtest.prepareTestEnvironment(settings)
-        with mock.patch('awesome_module.buzz', side_effect=Exception()):
-            vfxtest.runNative(settings=settings, use_coverage=False)
+        with OutputTrap():
+            with mock.patch('awesome_module.buzz', return_value=1):
+                vfxtest.runNative(settings=settings, use_coverage=False)
 
         self.assertEqual(settings['files_run'], 1)
         self.assertEqual(settings['tests_run'], 2)

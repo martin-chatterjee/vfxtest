@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019, Martin Chatterjee. All rights reserved.
+# Copyright (c) 2019-2022, Martin Chatterjee. All rights reserved.
 # -----------------------------------------------------------------------------
 
 import unittest
@@ -9,6 +9,8 @@ import json
 
 import vfxtest
 mock = vfxtest.mock
+
+from output_trap import OutputTrap
 
 
 # -----------------------------------------------------------------------------
@@ -43,7 +45,8 @@ class RunTestSuiteTestCase(unittest.TestCase):
         settings = vfxtest.collectSettings()
         vfxtest.prepareTestEnvironment(settings)
 
-        vfxtest.runTestSuite(settings=settings)
+        with OutputTrap():
+            vfxtest.runTestSuite(settings=settings)
 
         self.assertEqual(settings['files_run'], 2)
         self.assertEqual(settings['tests_run'], 6)
@@ -62,7 +65,9 @@ class RunTestSuiteTestCase(unittest.TestCase):
         settings['context'] = 'python3.x'
         settings['debug_mode'] = True
 
-        vfxtest.runTestSuite(settings=settings)
+        with OutputTrap():
+            vfxtest.runTestSuite(settings=settings)
+
         self.assertEqual(settings['files_run'], 2)
         self.assertEqual(settings['tests_run'], 6)
         self.assertEqual(settings['errors'], 0)
@@ -83,7 +88,8 @@ class RunTestSuiteTestCase(unittest.TestCase):
 
         settings['context'] = 'python'
 
-        vfxtest.runTestSuite(settings=settings)
+        with OutputTrap():
+            vfxtest.runTestSuite(settings=settings)
 
         self.assertEqual(settings['files_run'], 4)
         self.assertEqual(settings['tests_run'], 12)
@@ -91,16 +97,16 @@ class RunTestSuiteTestCase(unittest.TestCase):
         self.assertTrue(os.path.exists(cov_file_3))
         self.assertTrue(os.path.exists(cov_file_2))
 
-    # # -------------------------------------------------------------------------
-    # def test04_runTestSuite_wrapper_script_not_found_raises_OSError(self):
+    # -------------------------------------------------------------------------
+    def test04_runTestSuite_wrapper_script_not_found_raises_KeyError(self):
 
-    #     settings = vfxtest.collectSettings()
-    #     vfxtest.prepareTestEnvironment(settings)
+        settings = vfxtest.collectSettings()
+        vfxtest.prepareTestEnvironment(settings)
 
-    #     settings['context'] = 'context_without_wrapper_script'
+        settings['context'] = 'context_without_wrapper_script'
 
-    #     with self.assertRaises(OSError):
-    #         vfxtest.runTestSuite(settings=settings)
+        with self.assertRaises(KeyError):
+            vfxtest.runTestSuite(settings=settings)
 
 
     # -------------------------------------------------------------------------
@@ -113,8 +119,9 @@ class RunTestSuiteTestCase(unittest.TestCase):
         settings['debug_mode'] = True
 
         with self.assertRaises(SystemExit):
-            with mock.patch('subprocess.Popen.wait', return_value=13):
-                vfxtest.runTestSuite(settings=settings)
+            with OutputTrap():
+                with mock.patch('subprocess.Popen.wait', return_value=13):
+                    vfxtest.runTestSuite(settings=settings)
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
