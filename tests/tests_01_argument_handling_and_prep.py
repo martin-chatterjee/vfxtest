@@ -223,37 +223,14 @@ class ArgumentHandlingAndPrepTestCase(unittest.TestCase):
 
         settings = vfxtest.collectSettings(['--cfg',
                                             './test_no-python-contexts.cfg'])
-        # Python 2.x
-        if sys.version.startswith('2.'):
-            vfxtest.prepareTestEnvironment(settings)
-            proof = './no_python_contexts/_dcc_settings/PYTHONPATH/mock/mock.py'
-            self.assertTrue(os.path.exists(proof))
-
-        elif sys.version.startswith('3.'):
-            with self.assertRaises(EnvironmentError):
-                vfxtest.prepareTestEnvironment(settings)
-        else:
-            raise EnvironmentError('Python version not tested: {}'.format(sys.version))
+        vfxtest.prepareTestEnvironment(settings)
+        proof = './no_python_contexts/_dcc_settings/PYTHONPATH/vfxtest.py'
+        self.assertTrue(os.path.exists(proof))
 
         shutil.rmtree('./no_python_contexts')
 
     # -------------------------------------------------------------------------
-    def test15_copyModulesToFolder_works_as_expected(self):
-        if os.path.exists('./copy_modules'):
-            shutil.rmtree('./copy_modules')
-
-        os.makedirs('./copy_modules')
-        module_names = ['os', 'sqlite3',]
-
-        vfxtest._copyModulesToFolder(module_names, './copy_modules')
-
-        self.assertTrue(os.path.exists('./copy_modules/os.py'))
-        self.assertTrue(os.path.exists('./copy_modules/sqlite3/__init__.py'))
-
-        shutil.rmtree('./copy_modules')
-
-    # -------------------------------------------------------------------------
-    def test16_initLogging(self):
+    def test15_initLogging(self):
 
         logger = logging.getLogger('vfxtest')
         vfxtest.initLogging(level=logging.DEBUG, format='PROOF: %(message)s')
