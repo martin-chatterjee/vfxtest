@@ -824,8 +824,7 @@ def _getPathToMyself():
     """
     # for Python 2 and 3 compatibility we need to ensure a .py suffix
     my_path = os.path.abspath(__file__).replace('\\', '/')
-    if my_path.endswith('.pyc'):
-        my_path = my_path.replace('.pyc', '.py')
+    my_path = my_path.replace('.pyc', '.py')
     return my_path
 
 
