@@ -735,6 +735,16 @@ def _preparePatchedEnvironment(settings, executable, context):
     if 'PYTHONPATH' in settings['context_details'][context]:
         context_pypath = str(settings['context_details'][context]['PYTHONPATH'])
         pypath_tokens.append(os.path.abspath(context_pypath))
+    # Deal with optional 'use-environment' setting.
+    use_env_name = settings['context_details'][context].get('use-environment', None)
+    if use_env_name:
+        virtualenv_site_packages = os.path.join(
+            settings['dcc_settings_path'],
+            'virtualenv_{}'.format(use_env_name),
+            'Lib',
+            'site-packages',
+        )
+        pypath_tokens.append(virtualenv_site_packages)
 
     pypath_tokens = [token for token in pypath_tokens if len(token)]
     env['PYTHONPATH'] = os.pathsep.join(pypath_tokens)
