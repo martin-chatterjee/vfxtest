@@ -40,25 +40,29 @@
         "mayapy" :
         {
             "executable" : "C:/Program Files/Autodesk/Maya2022/bin/mayapy.exe",
-            "version" : "2022"
+            "version" : "2022",
+            "use-environment" : "python3.x"
         },
         # ----------------------------
         "maya" :
         {
             "executable" : "C:/Program Files/Autodesk/Maya2022/bin/maya.exe",
-            "version" : "2022"
+            "version" : "2022",
+            "use-environment" : "python3.x"
         },
         # ----------------------------
         "hython" :
         {
             "executable" : "C:/Program Files/Side Effects Software/Houdini 19.0.622/bin/hython.exe",
-            "version" : "19.0.622"
+            "version" : "19.0.622",
+            "use-environment" : "python3.x"
         },
         # ----------------------------
         "houdini" :
         {
             "executable" : "C:/Program Files/Side Effects Software/Houdini 19.0.622/bin/houdini.exe",
-            "version" : "19.0.622"
+            "version" : "19.0.622",
+            "use-environment" : "python3.x"
         }
     }
 }
