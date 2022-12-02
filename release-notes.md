@@ -17,6 +17,7 @@
     - Introduced `use-environment` context setting for DCC contexts, specifying which Python environment they should use.
       > **Warning**\
       > This is a **breaking change** for DCC contexts. `use-environment` **must** be specified for all DCC contexts.
+    - Now uses `console_scripts` mechanism in `setup.py`.
 
 <br>
 
