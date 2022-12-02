@@ -721,22 +721,23 @@ def _preparePatchedEnvironment(settings, executable, context):
     dcc_settings = settings['dcc_settings_path']
     cwd = os.path.abspath(settings['cwd']).replace('\\', '/')
 
-    # patch PYTHONPATH
-    tokens = []
-    env_var_value = env.get('PYTHONPATH', '')
-    if env_var_value != '':
-        tokens = env_var_value.split(os.pathsep)
-    tokens.insert(0, cwd.replace('\\', '/'))
+    # Assemble PYTHONPATH.
+    settings_pythonpath = os.path.join(dcc_settings, 'PYTHONPATH')
+
+    pypath_tokens = env.get('PYTHONPATH', '').split(os.pathsep)
+    pypath_tokens.insert(0, cwd)
+    pypath_tokens.insert(0, settings_pythonpath)
     if 'PYTHONPATH' in settings:
-        tokens.append(os.path.abspath(str(settings['PYTHONPATH'])))
+        settings_pypath = str(settings['PYTHONPATH'])
+        pypath_tokens.append(os.path.abspath(settings_pypath))
     if 'PYTHONPATH' in settings['context_details'][context]:
-        pythonpath = str(settings['context_details'][context]['PYTHONPATH'])
-        tokens.append(os.path.abspath(pythonpath))
-    env['PYTHONPATH'] = os.pathsep.join(tokens)
+        context_pypath = str(settings['context_details'][context]['PYTHONPATH'])
+        pypath_tokens.append(os.path.abspath(context_pypath))
 
-    dcc_pythonpath = '{}/PYTHONPATH'.format(dcc_settings)
+    pypath_tokens = [token for token in pypath_tokens if len(token)]
+    env['PYTHONPATH'] = os.pathsep.join(pypath_tokens)
 
-    # if this is a python virtual environment, activate it
+    # If this is a python virtual environment, activate it.
     exe_folder = os.path.dirname(executable)
     exe_name = os.path.basename(executable).lower().replace('.exe', '')
     if exe_name == 'python':
@@ -754,9 +755,6 @@ def _preparePatchedEnvironment(settings, executable, context):
     context = settings.get('context', '')
     if context.lower().find('maya') != -1:
         maya_version = settings['context_details'][context].get('version', '')
-        env['PYTHONPATH'] = '{}{}{}'.format(dcc_pythonpath,
-                                            os.pathsep,
-                                            env['PYTHONPATH'])
         env['MAYA_APP_DIR'] = '{}/{}.vfxtest.{}'.format(dcc_settings,
                                                         context,
                                                         maya_version)
@@ -768,9 +766,6 @@ def _preparePatchedEnvironment(settings, executable, context):
 
     # deal with houdini/hython context
     if (context.lower().find('hython') != -1 or context.lower().find('houdini') != -1):
-        env['PYTHONPATH'] = '{}{}{}'.format(dcc_pythonpath,
-                                            os.pathsep,
-                                            env['PYTHONPATH'])
         env['HOUDINI_USER_PREF_DIR'] = '{}/houdini.vfxtest.__HVER__'.format(dcc_settings)
         env.pop('HSITE', None)
 
