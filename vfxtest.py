@@ -271,11 +271,11 @@ def runInSubprocess(settings, context):
 
     executable = _getExecutable(ctxt_settings)
     env = _preparePatchedEnvironment(ctxt_settings, executable, context)
-    vfxtest_py = _getPathToMyself()
     args = [executable, ]
     is_maya = False
     if context.lower().find('mayapy') != -1:
-        args.append(vfxtest_py)
+        args.append('-m')
+        args.append('vfxtest')
 
     elif context.lower().find('maya') != -1:
         is_maya = True
@@ -283,7 +283,8 @@ def runInSubprocess(settings, context):
         args.append('source vfxtest_maya; vfxtestSchedule();')
 
     elif context.lower().find('hython') != -1:
-        args.append(vfxtest_py)
+        args.append('-m')
+        args.append('vfxtest')
 
     elif context.lower().find('houdini') != -1:
         dcc_settings = settings['dcc_settings_path']
@@ -291,7 +292,8 @@ def runInSubprocess(settings, context):
         args.append(hou_helper)
 
     else:
-        args.append(vfxtest_py)
+        args.append('-m')
+        args.append('vfxtest')
 
     logger.info('')
     logger.info('/'*80)
