@@ -326,7 +326,7 @@ def runInSubprocess(settings, context):
                env=env) as proc:
         sys.stdout.flush()
         while True:
-            line = proc.stdout.readline().decode()
+            line = proc.stdout.readline()
             if not line:
                 break
             if not _updateStatsFromStdout(settings, line):
@@ -649,22 +649,23 @@ def _updateStatsFromStdout(settings, line):
     """
     status = False
 
-    try:
-        tokens = line.split('<vfxtest-stats>')
+    line = line.decode('utf-8', errors="replace")
+
+    tokens = line.split('<vfxtest-stats>')
+    if len(tokens) > 1:
         stats = tokens[1].split('</vfxtest-stats>')[0]
-        decoded = json.loads(stats)
-
-        settings['files_run'] = decoded['files_run']
-        settings['tests_run'] = decoded['tests_run']
-        settings['errors'] = decoded['errors']
-
-
-        status = True
-
-    except (IndexError, TypeError) as e:
-        pass
+        try:
+            decoded = json.loads(stats)
+        except (ValueError): # pragma: no cover
+            pass
+        else:
+            settings['files_run'] = decoded['files_run']
+            settings['tests_run'] = decoded['tests_run']
+            settings['errors'] = decoded['errors']
+            status = True
 
     return status
+
 
 # -----------------------------------------------------------------------------
 def logStats(settings):
