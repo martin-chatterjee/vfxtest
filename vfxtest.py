@@ -48,6 +48,8 @@ except ImportError: # pragma: no cover_3
 
 import coverage
 
+__version__ = '0.2.1'
+
 main = unittest.main
 
 logger = logging.getLogger('vfxtest')
