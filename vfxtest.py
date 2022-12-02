@@ -1417,6 +1417,11 @@ def _initializeVirtualEnv(venv_path, details, dcc_settings_path):
             sys.stdout.write(line)
         proc.wait()
 
+    # Remove vfxtest.py file from virtualenv.
+    vfxtest_py = os.path.join(venv_path, 'Lib', 'site-packages', 'vfxtest.py')
+    if os.path.exists(vfxtest_py):
+        os.remove(vfxtest_py)
+
     logger.info('/'*80)
     logger.info('')
 
