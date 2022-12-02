@@ -1312,16 +1312,6 @@ def _ensureVirtualEnvs(settings):
 
 
 # -----------------------------------------------------------------------------
-def _getPythonVersion(executable):
-    """
-    """
-    proc = subprocess.Popen([executable, '--version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    proc.wait()
-    out = proc.communicate()[0]
-    version = out.decode('utf-8').replace('Python', '').split()[0]
-    return version
-
-# -----------------------------------------------------------------------------
 def _collectPythonExecutableDetails(settings):
     """Extracts details of all python executables specified in
     context_details.
