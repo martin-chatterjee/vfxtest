@@ -93,10 +93,10 @@ def constructParser():
     )
 
     parser.add_argument(
-        '-ff',
-        '--fail-fast',
-        help='Stop test suite on first error.',
-        action='store_false',
+        '-coe',
+        '--continue-on-error',
+        help='Continue test suite on error.',
+        action='store_true',
     )
 
     parser.add_argument(
@@ -118,7 +118,7 @@ def commandLine(arguments):
     main(
         folder_path='.',
         test_dccs=namespace.test_dccs,
-        fail_fast=namespace.fail_fast,
+        fail_fast=(not namespace.continue_on_error),
         log_output=namespace.log_output,
         cover_testfiles=namespace.cover_testfiles,
     )
