@@ -1,7 +1,7 @@
 # `vfxtest` Release Notes
 
 
-## `Next` (Date)
+## `0.2.2` (02-Dec-2022)
 
 - **Refactored test suite**: _(→ [Issue #3](https://github.com/martin-chatterjee/vfxtest/issues/3))_
     - Added **command line argument** handling.
