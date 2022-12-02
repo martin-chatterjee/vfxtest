@@ -816,8 +816,9 @@ def _getPathToMyself():
 
     """
     # for Python 2 and 3 compatibility we need to ensure a .py suffix
-    my_path = __file__.replace('\\', '/')
-    my_path = my_path.replace('.pyc', '.py')
+    my_path = os.path.abspath(__file__).replace('\\', '/')
+    if my_path.endswith('.pyc'):
+        my_path = my_path.replace('.pyc', '.py')
     return my_path
 
 
@@ -1180,21 +1181,18 @@ def _prepareHelpers(settings):
 
 # -----------------------------------------------------------------------------
 def _preparePythonPath(settings):
-    """Creates a PYTHONPATH folder in dcc_settings_path and copies all
-    our pure-python requirements in there.
+    """Creates a PYTHONPATH folder in dcc_settings_path and copies the
+    current 'vfxtest.py' file on there.
+
+    Also stores the absolute path of this 'vfxtest.py' file
+    in `settings['vfxtest_py_path']`.
 
     If the folder already exists it will not be recreated.
-
-    Right now copies over these modules:
-        coverage
-        mock
-        six
-        vfxtest
 
     Later on we will point the PYTHONPATH environment variable to this
     folder for our child processes.
     This way all embedded Python interpreters inside a DCC will be able
-    run vfxtest and its required modules.
+    run the same up-to-date vfxtest package.
 
     Args:
         settings (dict) : settings dictionary
@@ -1204,88 +1202,19 @@ def _preparePythonPath(settings):
     if test_no_pythonpath is True:
         return
 
-    pythonpath = '{}/PYTHONPATH'.format(settings['dcc_settings_path'])
+    pythonpath = os.path.join(settings['dcc_settings_path'], 'PYTHONPATH')
+    vfxtest_py_path = os.path.join(pythonpath, 'vfxtest.py')
+
     if os.path.exists(pythonpath):
+        if os.path.exists(vfxtest_py_path):
+            settings['vfxtest_py_path'] = vfxtest_py_path
         return
 
     os.makedirs(pythonpath)
 
     # copy over vfxtest
     vfxtest_py = _getPathToMyself()
-    dest_path = '{}/vfxtest.py'.format(pythonpath)
-    shutil.copy2(vfxtest_py, dest_path)
-
-    # is there a Python 2.x virtualenv that we can harvest?
-    virtualenvs = _collectPythonExecutableDetails(settings)
-    for env in virtualenvs:
-        executable = virtualenvs[env]['executable']
-        if _getPythonVersion(executable).startswith('2.'):
-            source = '{}/Lib/site-packages'.format(env)
-            _copyFolderContentToFolder(source, pythonpath)
-            return
-
-    # Fallback: If my current Python is 2.x then we can use that
-    if sys.version.startswith('2.'): # pragma: no cover_2
-        module_names = ['coverage', 'mock', 'six', 'funcsigs']
-        _copyModulesToFolder(module_names, pythonpath)
-        return
-
-    else: # pragma: no cover_2
-
-        error = ["",
-                 "'vfxtest' needs access to a Python 2.x environment.",
-                 "",
-                 "You have two options:",
-                 "",
-                 "    - run vfxtest from a Python 2.x interpreter",
-                 "    - define a 'Python 2.x' context in your config",
-                 "      (even if you don't use it)"]
-        raise EnvironmentError('\n'.join(error))
-
-
-# -----------------------------------------------------------------------------
-def _copyModulesToFolder(module_names, dest):
-    """Copies the Python modules specified by their names to the destination
-    folder.
-
-    Args:
-        module_names (list) : list of module names to copy
-        dest (string)       : destination folder path
-
-    """
-    for name in module_names:
-        module = importlib.import_module(name)
-
-        if hasattr(module, '__path__') and len(module.__path__) > 0:
-            module_path = module.__path__[0].replace('\\', '/')
-        else:
-            module_path = module.__file__.replace('\\', '/')
-        module_path = module_path.replace('.pyc', '.py')
-        module_name = os.path.basename(module_path)
-        dest_path = '{}/{}'.format(dest, module_name)
-
-        if os.path.isdir(module_path):
-            shutil.copytree(module_path, dest_path)
-        else:
-            shutil.copyfile(module_path, dest_path)
-
-
-# -----------------------------------------------------------------------------
-def _copyFolderContentToFolder(source, dest):
-    """Copies content of source folder into dest folder.
-
-    Args:
-        source (string) : source folder path
-        dest (string)   : destination folder path
-
-    """
-    for item in os.listdir(source):
-        source_path = '{}/{}'.format(source, item)
-        target_path = '{}/{}'.format(dest, item)
-        if os.path.isdir(source_path):
-            shutil.copytree(source_path, target_path)
-        else:
-            shutil.copy2(source_path, target_path)
+    shutil.copy2(vfxtest_py, vfxtest_py_path)
 
 
 # -----------------------------------------------------------------------------
