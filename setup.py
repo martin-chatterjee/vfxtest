@@ -27,10 +27,6 @@ setup(
     py_modules=[
         'vfxtest',
     ],
-    scripts=[
-        'bin/vfxtest.cmd',
-        'bin/vfxtest',
-    ],
     install_requires=[
         'virtualenv',
         'coverage >= 4.5',
@@ -57,5 +53,9 @@ setup(
 
     python_requires=('>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, '
                      '!=3.5.*, !=3.6.*, <4'),
-
+    entry_points={
+        "console_scripts": [
+            "vfxtest=vfxtest:main",
+        ]
+    },
 )
